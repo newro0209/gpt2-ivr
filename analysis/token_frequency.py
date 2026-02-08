@@ -4,49 +4,21 @@ import argparse
 import json
 import logging
 from collections import Counter
-from concurrent.futures import ProcessPoolExecutor
+from concurrent.futures import ThreadPoolExecutor
 from itertools import islice
+import os
 from pathlib import Path
-from typing import Iterable, Iterator
+from threading import Lock
+from transformers import BatchEncoding, GPT2Tokenizer
+from typing import Iterable, Iterator, cast
 
-try:
-    from tqdm import tqdm
-except ImportError:  # pragma: no cover - 선택적 의존성
-    tqdm = None
-
-
-_TOKENIZER = None
+from tqdm import tqdm
 
 
 def build_logger() -> logging.Logger:
     """로거를 설정한다."""
     logging.basicConfig(level=logging.INFO, format="[%(levelname)s] %(message)s")
     return logging.getLogger("token-frequency")
-
-
-def load_tokenizer(model_name: str):
-    """GPT-2 BPE 토크나이저를 로드한다."""
-    try:
-        from transformers import GPT2TokenizerFast
-    except ImportError as exc:  # pragma: no cover - 런타임 의존성
-        raise SystemExit(
-            "transformers 패키지가 필요합니다. `uv pip install transformers`로 설치하세요."
-        ) from exc
-
-    return GPT2TokenizerFast.from_pretrained(model_name)
-
-
-def init_worker(model_name: str) -> None:
-    """멀티프로세스 워커 초기화를 수행한다."""
-    global _TOKENIZER
-    _TOKENIZER = load_tokenizer(model_name)
-
-
-def encode_in_worker(text: str) -> list[int]:
-    """워커에서 텍스트를 토큰 id 시퀀스로 변환한다."""
-    if _TOKENIZER is None:
-        raise RuntimeError("토크나이저가 초기화되지 않았습니다.")
-    return _TOKENIZER.encode(text, add_special_tokens=False)
 
 
 def find_input_files(input_dir: Path, inputs: list[Path]) -> list[Path]:
@@ -108,13 +80,8 @@ def iter_texts(files: list[Path], text_key: str, encoding: str) -> Iterator[str]
 
 def write_frequency_parquet(counter: Counter[int], output_path: Path) -> None:
     """토큰 빈도를 parquet로 저장한다."""
-    try:
-        import pyarrow as pa
-        import pyarrow.parquet as pq
-    except ImportError as exc:  # pragma: no cover - 런타임 의존성
-        raise SystemExit(
-            "pyarrow 패키지가 필요합니다. `uv pip install pyarrow`로 설치하세요."
-        ) from exc
+    import pyarrow as pa
+    import pyarrow.parquet as pq
 
     rows = sorted(counter.items(), key=lambda item: (-item[1], item[0]))
     token_ids = [token_id for token_id, _ in rows]
@@ -123,57 +90,52 @@ def write_frequency_parquet(counter: Counter[int], output_path: Path) -> None:
     pq.write_table(table, output_path)
 
 
-def maybe_wrap_progress(iterable: Iterable[list[int]], logger: logging.Logger, log_every: int):
-    """진행 표시를 위한 래퍼를 반환한다."""
-    if tqdm is not None:
-        return tqdm(iterable, desc="토큰화", unit="문장")
-
-    def generator():
-        for index, item in enumerate(iterable, start=1):
-            if index % log_every == 0:
-                logger.info("진행 상황: %d 문장 처리", index)
-            yield item
-
-    return generator()
-
-
 def collect_statistics(
     texts: Iterable[str],
     output_sequences: Path,
-    model_name: str,
+    tokenizer: GPT2Tokenizer,
     workers: int,
     chunk_size: int,
-    log_every: int,
 ) -> Counter[int]:
     """토큰 시퀀스와 빈도 통계를 생성한다."""
     counter: Counter[int] = Counter()
+    encode_lock = Lock()
+
+    # 입력 스트림 청크 분할
+    def chunk_iter(source: Iterable[str]) -> Iterator[list[str]]:
+        iterator = iter(source)
+        while True:
+            chunk = list(islice(iterator, chunk_size))
+            if not chunk:
+                break
+            yield chunk
+
+    # 청크 단위 토큰화
+    def encode_chunk(chunk: list[str]) -> list[list[int]]:
+        # 토크나이저 스레드 안전성 보호
+        with encode_lock:
+            output: BatchEncoding = tokenizer(
+                chunk,
+                add_special_tokens=False,
+                truncation=True,
+                max_length=tokenizer.model_max_length,
+            )
+        return cast(list[list[int]], output["input_ids"])
 
     output_sequences.parent.mkdir(parents=True, exist_ok=True)
     with output_sequences.open("w", encoding="utf-8") as handle:
-        if workers > 1:
-            with ProcessPoolExecutor(
-                max_workers=workers,
-                initializer=init_worker,
-                initargs=(model_name,),
-            ) as executor:
-                for token_ids in maybe_wrap_progress(
-                    executor.map(encode_in_worker, texts, chunksize=chunk_size),
-                    logger=logging.getLogger("token-frequency"),
-                    log_every=log_every,
-                ):
+        # 청크 스레드 병렬 처리
+        with ThreadPoolExecutor(max_workers=workers) as executor:
+            for chunk_ids in tqdm(
+                executor.map(encode_chunk, chunk_iter(texts)),
+                desc="토큰화",
+                unit="문장",
+            ):
+                # 청크 결과 누적 및 기록
+                for token_ids in chunk_ids:
                     counter.update(token_ids)
                     handle.write(" ".join(str(token_id) for token_id in token_ids))
                     handle.write("\n")
-        else:
-            tokenizer = load_tokenizer(model_name)
-            for text in maybe_wrap_progress(
-                (tokenizer.encode(item, add_special_tokens=False) for item in texts),
-                logger=logging.getLogger("token-frequency"),
-                log_every=log_every,
-            ):
-                counter.update(text)
-                handle.write(" ".join(str(token_id) for token_id in text))
-                handle.write("\n")
 
     return counter
 
@@ -221,26 +183,20 @@ def parse_args() -> argparse.Namespace:
     parser.add_argument(
         "--workers",
         type=int,
-        default=1,
-        help="프로세스 워커 수",
+        default=max(1, int((os.cpu_count() or 1) * 2)),
+        help="스레드 워커 수",
     )
     parser.add_argument(
         "--chunk-size",
         type=int,
         default=50,
-        help="멀티프로세싱 청크 크기",
+        help="스레드 청크 크기",
     )
     parser.add_argument(
         "--max-texts",
         type=int,
         default=0,
         help="처리할 최대 텍스트 수 (0이면 전체)",
-    )
-    parser.add_argument(
-        "--log-every",
-        type=int,
-        default=1000,
-        help="진행 로그 출력 간격",
     )
     parser.add_argument(
         "--encoding",
@@ -253,28 +209,35 @@ def parse_args() -> argparse.Namespace:
 
 def main() -> None:
     """엔트리 포인트."""
+    # CLI 설정 로드
     args = parse_args()
+    # 로깅 초기화
     logger = build_logger()
 
+    # 입력 파일 목록 수집
     input_files = find_input_files(args.input_dir, args.input)
     if not input_files:
         raise SystemExit("입력 파일을 찾을 수 없습니다.")
 
     logger.info("입력 파일 %d개를 탐색했습니다.", len(input_files))
 
+    # 텍스트 스트림 구성
     texts = iter_texts(input_files, args.text_key, args.encoding)
     if args.max_texts > 0:
         texts = islice(texts, args.max_texts)
 
+    # 토크나이저 로드
+    tokenizer = GPT2Tokenizer.from_pretrained(args.model_name)
+    # 토큰화 및 빈도 집계
     counter = collect_statistics(
         texts,
         output_sequences=args.output_sequences,
-        model_name=args.model_name,
+        tokenizer=tokenizer,
         workers=max(args.workers, 1),
         chunk_size=max(args.chunk_size, 1),
-        log_every=max(args.log_every, 1),
     )
 
+    # 결과물 저장
     args.output_frequency.parent.mkdir(parents=True, exist_ok=True)
     write_frequency_parquet(counter, args.output_frequency)
 
