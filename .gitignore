@@ -268,5 +268,8 @@ $RECYCLE.BIN/
 
 # End of https://www.toptal.com/developers/gitignore/api/windows,macos,linux,visualstudiocode,python
 
+# Project-specific artifacts
 corpora
 analysis/reports
+artifacts/logs/
+*.log
