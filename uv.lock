@@ -1,0 +1,58 @@
+version = 1
+revision = 3
+requires-python = ">=3.13"
+
+[[package]]
+name = "gpt2-ivr"
+version = "0.1.0"
+source = { editable = "." }
+dependencies = [
+    { name = "pyfiglet" },
+    { name = "pyright" },
+]
+
+[package.metadata]
+requires-dist = [
+    { name = "pyfiglet", specifier = ">=1.0.4" },
+    { name = "pyright", specifier = ">=1.1.408" },
+]
+
+[[package]]
+name = "nodeenv"
+version = "1.10.0"
+source = { registry = "http://172.20.48.1:3141/root/pypi/+simple/" }
+sdist = { url = "http://172.20.48.1:3141/root/pypi/+f/996/c191ad80897d0/nodeenv-1.10.0.tar.gz", hash = "sha256:996c191ad80897d076bdfba80a41994c2b47c68e224c542b48feba42ba00f8bb" }
+wheels = [
+    { url = "http://172.20.48.1:3141/root/pypi/+f/5bb/13e3eed292361/nodeenv-1.10.0-py2.py3-none-any.whl", hash = "sha256:5bb13e3eed2923615535339b3c620e76779af4cb4c6a90deccc9e36b274d3827" },
+]
+
+[[package]]
+name = "pyfiglet"
+version = "1.0.4"
+source = { registry = "http://172.20.48.1:3141/root/pypi/+simple/" }
+sdist = { url = "http://172.20.48.1:3141/root/pypi/+f/db9/c9940ed1bf304/pyfiglet-1.0.4.tar.gz", hash = "sha256:db9c9940ed1bf3048deff534ed52ff2dafbbc2cd7610b17bb5eca1df6d4278ef" }
+wheels = [
+    { url = "http://172.20.48.1:3141/root/pypi/+f/65b/57b7a8e1dff8a/pyfiglet-1.0.4-py3-none-any.whl", hash = "sha256:65b57b7a8e1dff8a67dc8e940a117238661d5e14c3e49121032bd404d9b2b39f" },
+]
+
+[[package]]
+name = "pyright"
+version = "1.1.408"
+source = { registry = "http://172.20.48.1:3141/root/pypi/+simple/" }
+dependencies = [
+    { name = "nodeenv" },
+    { name = "typing-extensions" },
+]
+sdist = { url = "http://172.20.48.1:3141/root/pypi/+f/f28/f2321f96852fa/pyright-1.1.408.tar.gz", hash = "sha256:f28f2321f96852fa50b5829ea492f6adb0e6954568d1caa3f3af3a5f555eb684" }
+wheels = [
+    { url = "http://172.20.48.1:3141/root/pypi/+f/090/b32865f4fdb1e/pyright-1.1.408-py3-none-any.whl", hash = "sha256:090b32865f4fdb1e0e6cd82bf5618480d48eecd2eb2e70f960982a3d9a4c17c1" },
+]
+
+[[package]]
+name = "typing-extensions"
+version = "4.15.0"
+source = { registry = "http://172.20.48.1:3141/root/pypi/+simple/" }
+sdist = { url = "http://172.20.48.1:3141/root/pypi/+f/0ce/a48d173cc12fa/typing_extensions-4.15.0.tar.gz", hash = "sha256:0cea48d173cc12fa28ecabc3b837ea3cf6f38c6d1136f85cbaaf598984861466" }
+wheels = [
+    { url = "http://172.20.48.1:3141/root/pypi/+f/f0f/a19c6845758ab/typing_extensions-4.15.0-py3-none-any.whl", hash = "sha256:f0fa19c6845758ab08074a0cfa8b7aecb71c999ca73d62883bc25cc018c4e548" },
+]
