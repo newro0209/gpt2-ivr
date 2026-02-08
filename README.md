@@ -31,46 +31,50 @@
 
 ## 🗂️ 디렉토리 구조
 
-```
+``` 
 gpt2-ivr/
-├─ README.md
-├─ pyproject.toml
-├─ uv.lock
+├─ README.md                    # 프로젝트 개요, 파이프라인, 실행 방법 문서
+├─ pyproject.toml               # 패키지 메타데이터, 의존성, 엔트리 포인트 설정
+├─ uv.lock                      # uv 의존성 락파일(재현 가능한 환경 고정)
 │
-├─ corpora/
-│   ├─ raw/
-│   └─ cleaned/
+├─ scripts/                     # 파이프라인 외 보조 유틸 스크립트
+│   ├─ set_internal_pypi_index.*    # 내부 PyPI 인덱스 설정
+│   └─ unset_internal_pypi_index.*  # 내부 PyPI 인덱스 해제
 │
-├─ analysis/
-│   ├─ token_frequency.py
-│   ├─ candidate_selection.py
-│   ├─ bpe_corpus_export.py
-│   └─ reports/
+├─ corpora/                     # 코퍼스 데이터 저장 루트
+│   ├─ raw/                     # 원본 수집 데이터
+│   └─ cleaned/                 # 전처리/정제 완료 데이터
 │
-├─ tokenizer/
-│   ├─ original/
-│   ├─ distilled_unigram/
-│   ├─ remapped/
-│   └─ remap_rules.yaml
+├─ analysis/                    # 분석 및 후보 선정 로직
+│   ├─ token_frequency.py       # 토큰 빈도 통계 계산
+│   ├─ candidate_selection.py   # IVR 교체 후보 토큰 선정
+│   ├─ bpe_corpus_export.py     # GPT-2 BPE 기준 토큰 시퀀스 추출
+│   └─ reports/                 # 분석 결과 산출물 저장
 │
-├─ embedding/
-│   ├─ extract.py
-│   ├─ reorder.py
-│   └─ init_new.py
+├─ tokenizer/                   # 토크나이저 자산 및 규칙
+│   ├─ original/                # 원본 GPT-2 토크나이저 보관
+│   ├─ distilled_unigram/       # Distillation 완료 Unigram 토크나이저
+│   ├─ remapped/                # IVR 적용 후 토크나이저
+│   └─ remap_rules.yaml         # 토큰 재할당 규칙 정의
 │
-├─ training/
-│   ├─ sft_config.yaml
-│   └─ train.py
+├─ embedding/                   # 임베딩 추출/재배치/초기화 로직
+│   ├─ extract.py               # 기존 모델 임베딩 추출
+│   ├─ reorder.py               # remap 규칙 기준 임베딩 재정렬
+│   └─ init_new.py              # 신규 토큰 임베딩 초기화
 │
-└─ src/
-    └─ ivr/
-        ├─ cli.py
-        ├─ analyze.py
-        ├─ distill_tokenizer.py
-        ├─ select.py
-        ├─ remap.py
-        ├─ align.py
-        └─ train.py
+├─ training/                    # 학습 설정 및 학습 실행 코드
+│   ├─ sft_config.yaml          # 미세조정 하이퍼파라미터/런타임 설정
+│   └─ train.py                 # accelerate 기반 학습 실행
+│
+└─ src/                         # 패키지 소스 루트
+    └─ ivr/                     # 파이프라인 오케스트레이션 패키지
+        ├─ cli.py               # `uv run ivr ...` CLI 엔트리 포인트
+        ├─ analyze.py           # analyze 단계 오케스트레이션
+        ├─ distill_tokenizer.py # distill-tokenizer 단계 오케스트레이션
+        ├─ select.py            # select 단계 오케스트레이션
+        ├─ remap.py             # remap 단계 오케스트레이션
+        ├─ align.py             # align 단계 오케스트레이션
+        └─ train.py             # train 단계 오케스트레이션
 ```
 
 ---
