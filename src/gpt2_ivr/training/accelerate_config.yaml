@@ -1,0 +1,12 @@
+# accelerate 실행 환경/분산 설정
+# https://huggingface.co/docs/accelerate/basic_tutorials/config
+compute_environment: "LOCAL_MACHINE"
+distributed_type: "NO"
+downcast_bf16: "no"
+gpu_ids: "all"
+machine_rank: 0
+main_training_function: "main"
+mixed_precision: "no"
+num_machines: 1
+num_processes: 1
+use_cpu: false
