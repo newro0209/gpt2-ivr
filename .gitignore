@@ -268,8 +268,10 @@ $RECYCLE.BIN/
 
 # End of https://www.toptal.com/developers/gitignore/api/windows,macos,linux,visualstudiocode,python
 
-# Project-specific artifacts
-corpora
-analysis/reports
-artifacts/logs/
-*.log
+# Project-specific artifacts (data, models, logs, etc.)
+# 모든 산출물은 artifacts/ 아래에 저장되며 git에 포함하지 않음
+artifacts/
+
+# Legacy paths (이전 구조 호환성)
+corpora/
+analysis/reports/
