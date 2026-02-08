@@ -10,6 +10,7 @@ readme = "README.md"
 requires-python = ">=3.13"
 dependencies = [
     "accelerate>=1.12.0",
+    "protobuf>=6.33.5",
     "pyarrow>=23.0.0",
     "pyfiglet>=1.0.4",
     "pyright>=1.1.408",
@@ -21,7 +22,7 @@ dependencies = [
 ]
 
 [project.scripts]
-ivr = "ivr.cli:main"
+ivr = "gpt2_ivr.cli:main"
 
 [tool.setuptools.packages.find]
 where = ["src"]
@@ -41,3 +42,8 @@ torchvision = [
 name = "pytorch-cu130"
 url = "https://download.pytorch.org/whl/cu130"
 explicit = true
+
+[dependency-groups]
+dev = [
+    "black>=26.1.0",
+]

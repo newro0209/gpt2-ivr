@@ -3,12 +3,15 @@
 ## 프로젝트 구조 및 모듈 구성
 
 - 프로젝트 목적을 `Tokenizer Model Migration + IVR`로 유지한다.
-- 파이프라인 제어 코드는 `src/ivr/`에 배치한다.
-- 분석 로직은 `analysis/`에 배치하고 연구용 산출물은 `analysis/reports/`에 저장한다.
-- 토크나이저 산출물은 `tokenizer/original/`, `tokenizer/distilled_unigram/`, `tokenizer/remapped/`에 단계별로 분리 저장한다.
-- 임베딩 처리 코드는 `embedding/`에 유지한다.
-- 학습 설정 및 실행 코드는 `training/`에 유지한다.
-- 코퍼스는 `corpora/raw/`와 `corpora/cleaned/`로 구분 관리한다.
+- 소스 코드는 `src/gpt2_ivr/` 표준 구조로 배치한다.
+- 파이프라인 제어 코드는 `src/gpt2_ivr/cli.py`와 `src/gpt2_ivr/commands/`에 배치한다.
+- 분석 로직은 `src/gpt2_ivr/analysis/`에 배치한다.
+- 모든 산출물은 `artifacts/` 아래에 저장한다:
+  - 분석 산출물: `artifacts/analysis/reports/`
+  - 토크나이저 산출물: `artifacts/tokenizers/{original,distilled_unigram,remapped}/`
+  - 코퍼스: `artifacts/corpora/{raw,cleaned}/`
+  - 임베딩: `artifacts/embeddings/`
+  - 학습 체크포인트: `artifacts/training/`
 
 ## 빌드, 테스트, 개발 명령어
 
@@ -27,7 +30,7 @@
 
 - Python 들여쓰기는 공백 4칸을 사용한다.
 - 함수명은 `snake_case`를 사용하고 목적이 드러나는 이름을 사용한다.
-- CLI 오케스트레이션 로직은 `src/ivr/cli.py`와 하위 파이프라인 모듈로 분리한다.
+- CLI 오케스트레이션 로직은 `src/gpt2_ivr/cli.py`와 `src/gpt2_ivr/commands/`로 분리한다.
 - 분석 코드와 실행 제어 코드를 혼합하지 않는다.
 - 토크나이저/임베딩/학습 단계 간 입출력 경로를 명시적으로 유지한다.
 - PEP 규칙을 엄격히 준수한다(PEP 8, PEP 257, PEP 484, PEP 526, PEP 544 포함).
@@ -52,10 +55,10 @@
 
 - 현재 파이프라인의 1차 검증은 단계별 산출물 확인으로 수행한다.
 - 아래 핵심 산출물 생성을 실행 검증 기준으로 사용한다.
-  - `analysis/reports/bpe_token_id_sequences.txt`
-  - `analysis/reports/replacement_candidates.csv`
-  - `tokenizer/distilled_unigram/`
-  - `tokenizer/remapped/`
+  - `artifacts/analysis/reports/bpe_token_id_sequences.txt`
+  - `artifacts/analysis/reports/replacement_candidates.csv`
+  - `artifacts/tokenizers/distilled_unigram/`
+  - `artifacts/tokenizers/remapped/`
 - 테스트 프레임워크 도입 시 테스트 코드는 `tests/`에 배치하고 파일명은 `test_*.py` 규칙을 따른다.
 - 자동화 테스트 명령어가 확정되면 본 문서와 `README.md`에 동시에 반영한다.
 

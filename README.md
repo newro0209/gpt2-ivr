@@ -41,40 +41,59 @@ gpt2-ivr/
 │   ├─ set_internal_pypi_index.*    # 내부 PyPI 인덱스 설정
 │   └─ unset_internal_pypi_index.*  # 내부 PyPI 인덱스 해제
 │
-├─ corpora/                     # 코퍼스 데이터 저장 루트
-│   ├─ raw/                     # 원본 수집 데이터
-│   └─ cleaned/                 # 전처리/정제 완료 데이터
-│
-├─ analysis/                    # 분석 및 후보 선정 로직
-│   ├─ token_frequency.py       # 토큰 빈도 통계 계산
-│   ├─ candidate_selection.py   # IVR 교체 후보 토큰 선정
-│   ├─ bpe_corpus_export.py     # GPT-2 BPE 기준 토큰 시퀀스 추출
-│   └─ reports/                 # 분석 결과 산출물 저장
-│
-├─ tokenizer/                   # 토크나이저 자산 및 규칙
-│   ├─ original/                # 원본 GPT-2 토크나이저 보관
-│   ├─ distilled_unigram/       # Distillation 완료 Unigram 토크나이저
-│   ├─ remapped/                # IVR 적용 후 토크나이저
-│   └─ remap_rules.yaml         # 토큰 재할당 규칙 정의
-│
-├─ embedding/                   # 임베딩 추출/재배치/초기화 로직
-│   ├─ extract.py               # 기존 모델 임베딩 추출
-│   ├─ reorder.py               # remap 규칙 기준 임베딩 재정렬
-│   └─ init_new.py              # 신규 토큰 임베딩 초기화
-│
-├─ training/                    # 학습 설정 및 학습 실행 코드
-│   ├─ sft_config.yaml          # 미세조정 하이퍼파라미터/런타임 설정
-│   └─ train.py                 # accelerate 기반 학습 실행
+├─ artifacts/                   # 파이프라인 산출물 저장 루트
+│   ├─ corpora/                 # 코퍼스 데이터
+│   │   ├─ raw/                 # 원본 수집 데이터
+│   │   └─ cleaned/             # 전처리/정제 완료 데이터
+│   ├─ tokenizers/              # 토크나이저 산출물
+│   │   ├─ original/            # 원본 GPT-2 토크나이저
+│   │   ├─ distilled_unigram/   # Distillation 완료 Unigram 토크나이저
+│   │   └─ remapped/            # IVR 적용 후 토크나이저
+│   ├─ analysis/                # 분석 산출물
+│   │   └─ reports/             # 분석 리포트
+│   ├─ embeddings/              # 임베딩 산출물
+│   ├─ logs/                    # 실행 로그 파일
+│   └─ training/                # 학습 체크포인트 및 로그
 │
 └─ src/                         # 패키지 소스 루트
-    └─ ivr/                     # 파이프라인 오케스트레이션 패키지
+    └─ gpt2_ivr/                # 메인 패키지
+        ├─ __init__.py          # 패키지 초기화
         ├─ cli.py               # `uv run ivr ...` CLI 엔트리 포인트
-        ├─ analyze.py           # analyze 단계 오케스트레이션
-        ├─ distill_tokenizer.py # distill-tokenizer 단계 오케스트레이션
-        ├─ select.py            # select 단계 오케스트레이션
-        ├─ remap.py             # remap 단계 오케스트레이션
-        ├─ align.py             # align 단계 오케스트레이션
-        └─ train.py             # train 단계 오케스트레이션
+        │
+        ├─ commands/            # Command 패턴 구현
+        │   ├─ __init__.py
+        │   ├─ base.py          # Command 추상 클래스
+        │   ├─ analyze_command.py
+        │   ├─ distill_command.py
+        │   └─ select_command.py
+        │
+        ├─ analysis/            # 분석 및 후보 선정 로직
+        │   ├─ __init__.py
+        │   ├─ token_frequency.py       # 토큰 빈도 통계 계산
+        │   ├─ candidate_selection.py   # IVR 교체 후보 토큰 선정
+        │   └─ bpe_corpus_export.py     # GPT-2 BPE 기준 토큰 시퀀스 추출
+        │
+        ├─ tokenizer/           # 토크나이저 로직
+        │   ├─ __init__.py
+        │   ├─ distill.py       # Unigram distillation 핵심 로직
+        │   ├─ validate.py      # distillation encode/decode 동일성 검증
+        │   └─ remap_rules.yaml # 토큰 재할당 규칙 정의
+        │
+        ├─ embedding/           # 임베딩 추출/재배치/초기화 로직
+        │   ├─ __init__.py
+        │   ├─ extract.py       # 기존 모델 임베딩 추출
+        │   ├─ reorder.py       # remap 규칙 기준 임베딩 재정렬
+        │   └─ init_new.py      # 신규 토큰 임베딩 초기화
+        │
+        ├─ training/            # 학습 설정 및 학습 실행 코드
+        │   ├─ __init__.py
+        │   ├─ accelerate_config.yaml   # accelerate 실행 환경/분산 설정
+        │   ├─ sft_config.yaml          # 미세조정 하이퍼파라미터/런타임 설정
+        │   └─ train.py                 # accelerate 기반 학습 실행
+        │
+        └─ utils/               # 공통 유틸리티
+            ├─ __init__.py
+            └─ logging_config.py
 ```
 
 ---
@@ -131,9 +150,9 @@ replacement_candidates.csv
         ↓
 remap_rules.yaml
         ↓
-embedding/reorder.py
+src/gpt2_ivr/embedding/reorder.py
         ↓
-train.py
+src/gpt2_ivr/training/train.py
 ```
 
 Distillation은 “안 깨지게 옮기는 단계”,
@@ -144,7 +163,7 @@ IVR은 “토큰 표현력을 개선하는 단계”입니다.
 ## 📁 분석 산출물 (연구 자산)
 
 ```
-analysis/reports/
+artifacts/analysis/reports/
 ├─ token_frequency.parquet
 ├─ replacement_candidates.csv
 ├─ bpe_token_id_sequences.txt
@@ -157,11 +176,16 @@ analysis/reports/
 
 ## 🧩 역할 분리 원칙
 
-| 위치            | 역할                       |
-| ------------- | ------------------------ |
-| `src/ivr/*`   | 파이프라인 제어 (Orchestration) |
-| `analysis/*`  | 분석 로직 (Research Library) |
-| `tokenizer/*` | 토크나이저 산출물                |
+| 위치                       | 역할                              |
+| ------------------------ | ------------------------------- |
+| `src/gpt2_ivr/cli.py`    | CLI 엔트리 포인트                    |
+| `src/gpt2_ivr/commands/` | Command 패턴 구현 (파이프라인 오케스트레이션) |
+| `src/gpt2_ivr/analysis/` | 분석 로직 (Research Library)        |
+| `src/gpt2_ivr/tokenizer/`| 토크나이저 로직                      |
+| `src/gpt2_ivr/embedding/`| 임베딩 추출/재배치 로직                 |
+| `src/gpt2_ivr/training/` | 학습 설정 및 실행 로직                  |
+| `artifacts/*`            | 토크나이저/분석/임베딩/학습 산출물           |
+| `scripts/*`              | 파이프라인 외 보조 유틸리티 스크립트         |
 
 ---
 
@@ -203,8 +227,8 @@ uv sync
 ### 2️⃣ 코퍼스 준비
 
 ```
-corpora/raw/     # 원본 데이터 수집
-corpora/cleaned/ # 정제 완료 데이터
+artifacts/corpora/raw/     # 원본 데이터 수집
+artifacts/corpora/cleaned/ # 정제 완료 데이터
 ```
 
 ---
@@ -216,7 +240,7 @@ uv run ivr analyze
 ```
 
 * GPT‑2 BPE 기준 token id 시퀀스를 생성
-* `analysis/reports/bpe_token_id_sequences.txt` 생성
+* 산출물: `artifacts/analysis/reports/bpe_token_id_sequences.txt`
 
 ---
 
@@ -227,7 +251,7 @@ uv run ivr distill-tokenizer
 ```
 
 * BPE와 동일한 encode/decode를 만드는 Unigram tokenizer 생성
-* 결과: `tokenizer/distilled_unigram/`
+* 산출물: `artifacts/tokenizers/distilled_unigram/`
 
 ---
 
@@ -238,7 +262,7 @@ uv run ivr select
 ```
 
 * 저빈도 토큰 분석
-* `replacement_candidates.csv` 생성
+* 산출물: `artifacts/analysis/reports/replacement_candidates.csv`
 
 ---
 
@@ -249,7 +273,7 @@ uv run ivr remap
 ```
 
 * IVR 적용 tokenizer 생성
-* 결과: `tokenizer/remapped/`
+* 산출물: `artifacts/tokenizers/remapped/`
 
 ---
 
