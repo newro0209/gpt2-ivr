@@ -185,9 +185,9 @@ def print_intro(logger: logging.Logger) -> None:
 def _create_analyze_command(args: argparse.Namespace) -> AnalyzeCommand:
     """analyze 커맨드를 생성한다."""
     return AnalyzeCommand(
-        input_dir=args.input_dir,
-        output_sequences=args.output_sequences,
-        output_frequency=args.output_frequency,
+        input_dir=Path(args.input_dir),
+        output_sequences=Path(args.output_sequences),
+        output_frequency=Path(args.output_frequency),
         model_name=args.model_name,
         workers=args.workers,
         chunk_size=args.chunk_size,
@@ -198,9 +198,9 @@ def _create_analyze_command(args: argparse.Namespace) -> AnalyzeCommand:
 def _create_distill_command(args: argparse.Namespace) -> DistillCommand:
     """distill-tokenizer 커맨드를 생성한다."""
     return DistillCommand(
-        original_tokenizer_dir=args.original_tokenizer_dir,
-        distilled_tokenizer_dir=args.distilled_tokenizer_dir,
-        corpus_dir=args.corpus_dir,
+        original_tokenizer_dir=Path(args.original_tokenizer_dir),
+        distilled_tokenizer_dir=Path(args.distilled_tokenizer_dir),
+        corpus_dir=Path(args.corpus_dir),
         vocab_size=args.vocab_size,
         model_name=args.model_name,
     )
@@ -209,10 +209,10 @@ def _create_distill_command(args: argparse.Namespace) -> DistillCommand:
 def _create_select_command(args: argparse.Namespace) -> SelectCommand:
     """select 커맨드를 생성한다."""
     return SelectCommand(
-        frequency_path=args.frequency_path,
-        sequences_path=args.sequences_path,
-        output_csv=args.output_csv,
-        output_log=args.output_log,
+        frequency_path=Path(args.frequency_path),
+        sequences_path=Path(args.sequences_path),
+        output_csv=Path(args.output_csv),
+        output_log=Path(args.output_log),
         model_name=args.model_name,
         max_candidates=args.max_candidates,
         min_token_len=args.min_token_len,
@@ -222,10 +222,10 @@ def _create_select_command(args: argparse.Namespace) -> SelectCommand:
 def _create_remap_command(args: argparse.Namespace) -> RemapCommand:
     """remap 커맨드를 생성한다."""
     return RemapCommand(
-        distilled_tokenizer_dir=args.distilled_tokenizer_dir,
-        remapped_tokenizer_dir=args.remapped_tokenizer_dir,
-        remap_rules_path=args.remap_rules_path,
-        replacement_candidates_path=args.replacement_candidates_path,
+        distilled_tokenizer_dir=Path(args.distilled_tokenizer_dir),
+        remapped_tokenizer_dir=Path(args.remapped_tokenizer_dir),
+        remap_rules_path=Path(args.remap_rules_path),
+        replacement_candidates_path=Path(args.replacement_candidates_path),
     )
 
 
@@ -260,7 +260,9 @@ def create_command(command_name: str, args: argparse.Namespace) -> Command:
     raise NotImplementedError(f"'{command_name}'는 유효하지 않은 커맨드입니다.")
 
 
-def dispatch(command_name: str, args: argparse.Namespace, logger: logging.Logger) -> None:
+def dispatch(
+    command_name: str, args: argparse.Namespace, logger: logging.Logger
+) -> None:
     """서브커맨드를 실행한다."""
     logger.info("[%s] 단계를 시작합니다.", command_name)
 
@@ -279,7 +281,7 @@ def main() -> None:
     """CLI 엔트리 포인트."""
     setup_logging()
     logger = get_logger("gpt2_ivr.cli")
-    
+
     parser = build_parser()
     args = parser.parse_args()
 

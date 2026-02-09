@@ -1,4 +1,5 @@
 """Tokenizer Remapping Command"""
+
 from __future__ import annotations
 
 import logging
@@ -18,30 +19,18 @@ class RemapCommand(Command):
 
     def __init__(
         self,
-        distilled_tokenizer_dir: Path | str = "artifacts/tokenizers/distilled_unigram",
-        remapped_tokenizer_dir: Path | str = "artifacts/tokenizers/remapped",
-        remap_rules_path: Path | str = "src/gpt2_ivr/tokenizer/remap_rules.yaml",
-        replacement_candidates_path: Path | str = "artifacts/analysis/reports/replacement_candidates.csv",
+        distilled_tokenizer_dir: Path = Path("artifacts/tokenizers/distilled_unigram"),
+        remapped_tokenizer_dir: Path = Path("artifacts/tokenizers/remapped"),
+        remap_rules_path: Path = Path("src/gpt2_ivr/tokenizer/remap_rules.yaml"),
+        replacement_candidates_path: Path = Path(
+            "artifacts/analysis/reports/replacement_candidates.csv"
+        ),
     ) -> None:
-        """
-        RemapCommand 초기화.
-
-        Args:
-            distilled_tokenizer_dir: 증류된 토크나이저 디렉토리 (절대 경로 또는 CWD 기준 상대 경로)
-            remapped_tokenizer_dir: 재할당 토크나이저 디렉토리 (절대 경로 또는 CWD 기준 상대 경로)
-            remap_rules_path: 재할당 규칙 파일 경로 (절대 경로 또는 CWD 기준 상대 경로)
-            replacement_candidates_path: 교체 후보 CSV 경로 (절대 경로 또는 CWD 기준 상대 경로)
-
-        Note:
-            - 상대 경로는 현재 작업 디렉토리(CWD) 기준으로 해석됩니다.
-            - CWD는 CLI를 실행하는 디렉토리에 따라 달라집니다.
-            - 안정적이고 예측 가능한 동작을 위해 절대 경로 사용을 권장합니다.
-        """
         self.logger = get_logger("gpt2_ivr.remap")
-        self.distilled_tokenizer_path = Path(distilled_tokenizer_dir)
-        self.remapped_tokenizer_path = Path(remapped_tokenizer_dir)
-        self.remap_rules_path = Path(remap_rules_path)
-        self.replacement_candidates_path = Path(replacement_candidates_path)
+        self.distilled_tokenizer_path = distilled_tokenizer_dir
+        self.remapped_tokenizer_path = remapped_tokenizer_dir
+        self.remap_rules_path = remap_rules_path
+        self.replacement_candidates_path = replacement_candidates_path
 
     def execute(self, **kwargs: Any) -> dict[str, Any]:
         """커맨드 실행 로직"""
