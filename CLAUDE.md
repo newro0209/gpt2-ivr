@@ -36,6 +36,7 @@
 - PEP 규칙을 엄격히 준수한다(PEP 8, PEP 257, PEP 484, PEP 526, PEP 544 포함).
 - 코드 포매팅은 Black Formatter를 사용한다.
 - 포매팅 검증 또는 적용은 `uv run black .` 명령을 기준으로 수행한다.
+- Black 설정: `line-length = 120`, `target-version = ["py313"]` (pyproject.toml 참조)
 - 타입 힌트 작성 시 `list`, `dict`, `str` 등 내장 제네릭 타입을 우선 사용한다.
 - Python 코드는 항상 Pythonic한 방식으로 작성한다.
 - 짧더라도 복잡한 로직에는 의도를 설명하는 주석을 추가한다.
@@ -65,6 +66,44 @@
   - `artifacts/tokenizers/remapped/`
 - 테스트 프레임워크 도입 시 테스트 코드는 `tests/`에 배치하고 파일명은 `test_*.py` 규칙을 따른다.
 - 자동화 테스트 명령어가 확정되면 본 문서와 `README.md`에 동시에 반영한다.
+
+## Git 브랜치 전략 및 워크플로우
+
+### 브랜치 생성 규칙
+
+- **모든 새로운 작업은 반드시 별도 브랜치를 생성하고 시작한다.**
+- master 브랜치에서 직접 작업하지 않는다.
+- 브랜치 이름은 다음 컨벤션을 따른다:
+  - 기능 추가: `feature/<기능명>` (예: `feature/add-validation`)
+  - 리팩토링: `refactor/<대상>` (예: `refactor/cli-simplification`)
+  - 버그 수정: `fix/<버그명>` (예: `fix/tokenizer-crash`)
+  - 문서 작업: `docs/<문서명>` (예: `docs/update-readme`)
+  - 실험/테스트: `experiment/<실험명>` (예: `experiment/new-algorithm`)
+
+### 작업 흐름
+
+1. **작업 시작**: 새 브랜치 생성
+   ```bash
+   git checkout -b <브랜치-타입>/<작업명>
+   ```
+
+2. **작업 진행**: 브랜치에서 코드 작성 및 커밋
+   - 커밋 메시지는 Gitmoji 포함, 한국어 작성
+   - 한 커밋에는 한 단계의 논리적 변경만 포함
+
+3. **작업 완료**: 브랜치 푸시 및 master 머지
+   ```bash
+   git push -u origin <브랜치명>
+   git checkout master
+   git merge <브랜치명> --no-ff
+   git push origin master
+   ```
+
+### 머지 전략
+
+- `--no-ff` 플래그를 사용하여 머지 커밋을 명시적으로 생성한다.
+- Fast-forward 머지를 피하여 브랜치 히스토리를 명확히 유지한다.
+- 머지 커밋 메시지에도 Gitmoji와 간결한 요약을 포함한다.
 
 ## 커밋 및 Pull Request 가이드라인
 
