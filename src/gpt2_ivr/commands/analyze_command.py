@@ -22,6 +22,8 @@ class AnalyzeCommand(Command):
         workers: int,
         chunk_size: int,
         max_texts: int,
+        text_key: str,
+        encoding: str,
     ):
         self.input_dir = input_dir
         self.output_sequences = output_sequences
@@ -30,6 +32,8 @@ class AnalyzeCommand(Command):
         self.workers = workers
         self.chunk_size = chunk_size
         self.max_texts = max_texts
+        self.text_key = text_key
+        self.encoding = encoding
 
     def execute(self, **kwargs: Any) -> dict[str, Any]:
         """토큰 빈도 분석 실행"""
@@ -42,6 +46,8 @@ class AnalyzeCommand(Command):
             workers=self.workers,
             chunk_size=self.chunk_size,
             max_texts=self.max_texts,
+            text_key=self.text_key,
+            encoding=self.encoding,
         )
 
         return {

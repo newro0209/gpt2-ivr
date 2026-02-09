@@ -1,10 +1,8 @@
 from __future__ import annotations
 
-import argparse
 import json
 from concurrent.futures import ThreadPoolExecutor
 from itertools import islice
-import os
 from pathlib import Path
 from threading import Lock
 from typing import Iterable, Iterator, cast
@@ -12,7 +10,6 @@ from typing import Iterable, Iterator, cast
 from tqdm import tqdm
 from transformers import BatchEncoding, GPT2Tokenizer
 
-from gpt2_ivr.constants import BPE_TOKEN_ID_SEQUENCES_FILE, CORPORA_CLEANED_DIR
 from gpt2_ivr.utils.logging_config import get_logger
 
 logger = get_logger(__name__)
@@ -124,101 +121,3 @@ def export_bpe_token_sequences(
                     total_tokens += len(token_ids)
 
     return total_lines, total_tokens
-
-
-def parse_args() -> argparse.Namespace:
-    """CLI 인자를 파싱한다."""
-    parser = argparse.ArgumentParser(
-        description="코퍼스를 GPT-2 BPE token id 시퀀스로 변환한다.",
-    )
-    parser.add_argument(
-        "--input-dir",
-        type=Path,
-        default=CORPORA_CLEANED_DIR,
-        help="코퍼스 입력 디렉토리",
-    )
-    parser.add_argument(
-        "--input",
-        type=Path,
-        action="append",
-        default=[],
-        help="개별 입력 파일 경로",
-    )
-    parser.add_argument(
-        "--text-key",
-        type=str,
-        default="text",
-        help="json/jsonl 텍스트 키",
-    )
-    parser.add_argument(
-        "--encoding",
-        type=str,
-        default="utf-8",
-        help="입력 파일 인코딩",
-    )
-    parser.add_argument(
-        "--model-name",
-        type=str,
-        default="openai-community/gpt2",
-        help="GPT-2 모델 이름",
-    )
-    parser.add_argument(
-        "--output",
-        type=Path,
-        default=BPE_TOKEN_ID_SEQUENCES_FILE,
-        help="BPE token id 시퀀스 출력 경로",
-    )
-    parser.add_argument(
-        "--workers",
-        type=int,
-        default=max(1, int((os.cpu_count() or 1) * 2)),
-        help="스레드 워커 수",
-    )
-    parser.add_argument(
-        "--chunk-size",
-        type=int,
-        default=50,
-        help="스레드 청크 크기",
-    )
-    parser.add_argument(
-        "--max-texts",
-        type=int,
-        default=0,
-        help="처리할 최대 텍스트 수 (0이면 전체)",
-    )
-    return parser.parse_args()
-
-
-def main() -> None:
-    """엔트리 포인트."""
-    args = parse_args()
-
-    input_files = find_input_files(args.input_dir, args.input)
-    if not input_files:
-        raise SystemExit("입력 파일을 찾을 수 없습니다.")
-
-    logger.info("입력 파일 %d개를 탐색했습니다.", len(input_files))
-
-    texts: Iterable[str] = iter_texts(input_files, args.text_key, args.encoding)
-    if args.max_texts > 0:
-        texts = islice(texts, args.max_texts)
-        logger.info("최대 텍스트 수 제한을 적용합니다: %d", args.max_texts)
-
-    logger.info("토크나이저를 로드합니다: %s", args.model_name)
-    tokenizer = GPT2Tokenizer.from_pretrained(args.model_name)
-
-    line_count, token_count = export_bpe_token_sequences(
-        texts=texts,
-        output_path=args.output,
-        tokenizer=tokenizer,
-        workers=max(args.workers, 1),
-        chunk_size=max(args.chunk_size, 1),
-    )
-
-    logger.info("BPE token id 시퀀스 저장 완료: %s", args.output)
-    logger.info("생성된 시퀀스 수: %d", line_count)
-    logger.info("누적 토큰 수: %d", token_count)
-
-
-if __name__ == "__main__":
-    main()

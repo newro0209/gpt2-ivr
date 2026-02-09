@@ -149,12 +149,12 @@ def analyze_token_frequency(
     inputs: list[Path],
     output_sequences: Path,
     output_frequency: Path,
-    model_name: str = "openai-community/gpt2",
-    text_key: str = "text",
-    workers: int = 0,
-    chunk_size: int = 50,
-    max_texts: int = 0,
-    encoding: str = "utf-8",
+    model_name: str,
+    text_key: str,
+    workers: int,
+    chunk_size: int,
+    max_texts: int,
+    encoding: str,
 ) -> FrequencyResult:
     """토큰 빈도를 분석한다.
 
