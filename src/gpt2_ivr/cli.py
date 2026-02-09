@@ -189,8 +189,39 @@ def build_parser() -> argparse.ArgumentParser:
         help="교체 후보 CSV 경로",
     )
 
-    # align 서브커맨드 (현재 stub)
-    subparsers.add_parser("align", help="embedding 재정렬")
+    # align 서브커맨드
+    align_parser = subparsers.add_parser("align", help="embedding 재정렬")
+    align_parser.add_argument(
+        "--model-name",
+        default="openai-community/gpt2",
+        help="GPT-2 모델 이름",
+    )
+    align_parser.add_argument(
+        "--original-tokenizer-dir",
+        default="artifacts/tokenizers/original",
+        help="원본 토크나이저 디렉토리",
+    )
+    align_parser.add_argument(
+        "--remapped-tokenizer-dir",
+        default="artifacts/tokenizers/remapped",
+        help="재할당 토크나이저 디렉토리",
+    )
+    align_parser.add_argument(
+        "--remap-rules-path",
+        default="src/gpt2_ivr/tokenizer/remap_rules.yaml",
+        help="재할당 규칙 파일 경로",
+    )
+    align_parser.add_argument(
+        "--embeddings-output-dir",
+        default="artifacts/embeddings",
+        help="임베딩 출력 디렉토리",
+    )
+    align_parser.add_argument(
+        "--init-strategy",
+        default="mean",
+        choices=["mean", "random", "zeros"],
+        help="신규 토큰 임베딩 초기화 전략",
+    )
 
     # train 서브커맨드 (현재 stub)
     subparsers.add_parser("train", help="미세조정")
@@ -261,9 +292,15 @@ def _create_remap_command(args: argparse.Namespace) -> RemapCommand:
 
 
 def _create_align_command(args: argparse.Namespace) -> AlignCommand:
-    """align 커맨드를 생성한다. (현재 stub)"""
-    # TODO: align 커맨드에 CLI 옵션이 추가되면 args를 사용하여 파라미터 전달
-    return AlignCommand()
+    """align 커맨드를 생성한다."""
+    return AlignCommand(
+        model_name=args.model_name,
+        original_tokenizer_dir=Path(args.original_tokenizer_dir),
+        remapped_tokenizer_dir=Path(args.remapped_tokenizer_dir),
+        remap_rules_path=Path(args.remap_rules_path),
+        embeddings_output_dir=Path(args.embeddings_output_dir),
+        init_strategy=args.init_strategy,
+    )
 
 
 def _create_train_command(args: argparse.Namespace) -> TrainCommand:
