@@ -104,6 +104,16 @@ def build_parser() -> argparse.ArgumentParser:
         default=0,
         help="처리할 최대 텍스트 수 (0이면 전체)",
     )
+    analyze_parser.add_argument(
+        "--text-key",
+        default="text",
+        help="json/jsonl 텍스트 키",
+    )
+    analyze_parser.add_argument(
+        "--encoding",
+        default="utf-8",
+        help="입력 파일 인코딩",
+    )
 
     # distill-tokenizer 서브커맨드
     distill_parser = subparsers.add_parser(
@@ -264,6 +274,8 @@ def _create_analyze_command(args: argparse.Namespace) -> AnalyzeCommand:
         workers=args.workers,
         chunk_size=args.chunk_size,
         max_texts=args.max_texts,
+        text_key=args.text_key,
+        encoding=args.encoding,
     )
 
 

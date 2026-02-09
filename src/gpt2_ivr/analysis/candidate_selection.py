@@ -2,10 +2,6 @@
 
 token_frequency.parquet 와 bpe_token_id_sequences.txt 를 기반으로
 저빈도 희생 토큰과 고빈도 도메인 바이그램 병합 후보를 매칭한다.
-
-산출물:
-    - REPLACEMENT_CANDIDATES_FILE (constants 모듈 참조)
-    - SELECTION_LOG_FILE (constants 모듈 참조)
 """
 
 from __future__ import annotations
@@ -366,9 +362,9 @@ def select_replacement_candidates(
     sequences_path: Path,
     output_csv: Path,
     output_log: Path,
-    model_name: str = "openai-community/gpt2",
-    max_candidates: int = 1000,
-    min_token_len: int = 2,
+    model_name: str,
+    max_candidates: int,
+    min_token_len: int,
 ) -> SelectionResult:
     """IVR 교체 후보를 선정한다.
 

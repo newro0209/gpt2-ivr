@@ -67,8 +67,8 @@ def distill_unigram_tokenizer(
     original_tokenizer_dir: Path,
     distilled_tokenizer_dir: Path,
     corpus_dir: Path,
-    vocab_size: int = 50257,
-    model_name: str = "openai-community/gpt2",
+    vocab_size: int,
+    model_name: str,
 ) -> DistillResult:
     """GPT-2 BPE 토크나이저의 동작을 모방하는 Unigram 토크나이저를 distillation 방식으로 학습한다.
 
