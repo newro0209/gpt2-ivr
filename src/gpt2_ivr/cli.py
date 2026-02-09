@@ -200,7 +200,6 @@ def setup_subparsers(subparsers: argparse._SubParsersAction) -> None:
     analyze_parser.add_argument(
         "--max-texts", type=non_negative_int, default=0, help="처리할 최대 텍스트 수 (0이면 전체)"
     )
-    analyze_parser.add_argument("--text-key", default="text", help="json/jsonl 텍스트 키")
     analyze_parser.add_argument("--encoding", default="utf-8", help="입력 파일 인코딩")
 
     # distill-tokenizer
@@ -352,7 +351,6 @@ def create_command(args: argparse.Namespace) -> Command:
             a.workers,
             a.chunk_size,
             a.max_texts,
-            a.text_key,
             a.encoding,
         ),
         "distill-tokenizer": lambda a: DistillCommand(
