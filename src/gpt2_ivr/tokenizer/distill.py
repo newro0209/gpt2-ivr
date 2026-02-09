@@ -1,4 +1,5 @@
 """토크나이저 증류 비즈니스 로직"""
+
 from __future__ import annotations
 
 import os
@@ -45,7 +46,9 @@ def get_training_corpus(
         yield []
         return
 
-    logger.info("📚 %d개의 코퍼스 파일을 '%s'에서 읽어들입니다.", len(files), corpus_dir)
+    logger.info(
+        "📚 %d개의 코퍼스 파일을 '%s'에서 읽어들입니다.", len(files), corpus_dir
+    )
     batch: list[str] = []
     for file_path in files:
         with open(file_path, "r", encoding="utf-8") as f:
@@ -86,20 +89,31 @@ def distill_unigram_tokenizer(
 
     # 1. GPT-2 BPE 토크나이저 로드
     # 원본 디렉토리가 비어있거나 유효한 토크나이저 파일이 없으면 Hub에서 로드
-    tokenizer_files = list(original_tokenizer_dir.glob("*")) if original_tokenizer_dir.exists() else []
-    
-    if tokenizer_files and any(f.name in ["tokenizer.json", "vocab.json", "merges.txt"] for f in tokenizer_files):
+    tokenizer_files = (
+        list(original_tokenizer_dir.glob("*"))
+        if original_tokenizer_dir.exists()
+        else []
+    )
+
+    if tokenizer_files and any(
+        f.name in ["tokenizer.json", "vocab.json", "merges.txt"]
+        for f in tokenizer_files
+    ):
         try:
-            original_tokenizer = AutoTokenizer.from_pretrained(str(original_tokenizer_dir))
+            original_tokenizer = AutoTokenizer.from_pretrained(
+                str(original_tokenizer_dir)
+            )
             logger.info(
                 "✅ 원본 GPT-2 토크나이저 로드 완료. (vocab_size: %d)",
                 len(original_tokenizer.get_vocab()),
             )
         except Exception as e:
-            logger.warning("원본 토크나이저 로드 실패(%s): %s", original_tokenizer_dir, e)
+            logger.warning(
+                "원본 토크나이저 로드 실패(%s): %s", original_tokenizer_dir, e
+            )
             logger.info("Hugging Face Hub에서 '%s'를 다운로드합니다.", model_name)
             original_tokenizer = AutoTokenizer.from_pretrained(model_name)
-            
+
             # Hub에서 로드한 토크나이저를 original 디렉토리에 저장
             original_tokenizer_dir.mkdir(parents=True, exist_ok=True)
             original_tokenizer.save_pretrained(str(original_tokenizer_dir))
@@ -109,9 +123,12 @@ def distill_unigram_tokenizer(
                 len(original_tokenizer.get_vocab()),
             )
     else:
-        logger.info("원본 토크나이저 디렉토리가 비어있습니다. Hugging Face Hub에서 '%s'를 다운로드합니다.", model_name)
+        logger.info(
+            "원본 토크나이저 디렉토리가 비어있습니다. Hugging Face Hub에서 '%s'를 다운로드합니다.",
+            model_name,
+        )
         original_tokenizer = AutoTokenizer.from_pretrained(model_name)
-        
+
         # Hub에서 로드한 토크나이저를 original 디렉토리에 저장
         original_tokenizer_dir.mkdir(parents=True, exist_ok=True)
         original_tokenizer.save_pretrained(str(original_tokenizer_dir))
@@ -133,7 +150,9 @@ def distill_unigram_tokenizer(
     # 3. 트레이너 설정
     special_tokens = original_tokenizer.all_special_tokens
     # 원본 토크나이저의 unk_token 사용 (GPT-2는 <|endoftext|>가 unk 역할)
-    unk_token = original_tokenizer.unk_token or original_tokenizer.eos_token or "<|endoftext|>"
+    unk_token = (
+        original_tokenizer.unk_token or original_tokenizer.eos_token or "<|endoftext|>"
+    )
     if unk_token not in special_tokens:
         special_tokens.append(unk_token)
 
@@ -156,7 +175,9 @@ def distill_unigram_tokenizer(
     # 4. 코퍼스를 사용하여 토크나이저 학습
     logger.info("📚 코퍼스 디렉토리 '%s'에서 토크나이저 학습을 시작합니다.", corpus_dir)
     # 배치 크기를 크게 하여 I/O 오버헤드 감소
-    tokenizer.train_from_iterator(get_training_corpus(corpus_dir, batch_size=10000), trainer=trainer)
+    tokenizer.train_from_iterator(
+        get_training_corpus(corpus_dir, batch_size=10000), trainer=trainer
+    )
     logger.info("✅ Unigram 토크나이저 학습 완료.")
 
     # 5. Distilled Unigram 토크나이저 저장
@@ -189,4 +210,3 @@ def distill_unigram_tokenizer(
         vocab_size=vocab_size,
         original_vocab_size=original_vocab_size,
     )
-

@@ -10,6 +10,7 @@ from gpt2_ivr.commands import (
     AnalyzeCommand,
     Command,
     DistillCommand,
+    InitCommand,
     SelectCommand,
     RemapCommand,
     AlignCommand,
@@ -31,6 +32,27 @@ def build_parser() -> argparse.ArgumentParser:
         description="Tokenizer Model Migration + IVR 파이프라인 CLI",
     )
     subparsers = parser.add_subparsers(dest="command", required=True)
+
+    # init 서브커맨드
+    init_parser = subparsers.add_parser(
+        "init", help="모델 및 토크나이저 초기화 (다운로드)"
+    )
+    init_parser.add_argument(
+        "--model-name",
+        default="openai-community/gpt2",
+        help="Hugging Face Hub 모델 이름",
+    )
+    init_parser.add_argument(
+        "--tokenizer-dir",
+        default="artifacts/tokenizers/original",
+        help="토크나이저 저장 디렉토리",
+    )
+    init_parser.add_argument(
+        "--force",
+        action="store_true",
+        default=False,
+        help="기존 파일이 있어도 다시 다운로드",
+    )
 
     # analyze 서브커맨드
     analyze_parser = subparsers.add_parser("analyze", help="BPE 토큰 시퀀스 분석")
@@ -182,6 +204,15 @@ def print_intro(logger: logging.Logger) -> None:
     logger.info("BPE -> Unigram 토크나이저 교체 후 IVR를 수행합니다.")
 
 
+def _create_init_command(args: argparse.Namespace) -> InitCommand:
+    """init 커맨드를 생성한다."""
+    return InitCommand(
+        model_name=args.model_name,
+        tokenizer_dir=Path(args.tokenizer_dir),
+        force=args.force,
+    )
+
+
 def _create_analyze_command(args: argparse.Namespace) -> AnalyzeCommand:
     """analyze 커맨드를 생성한다."""
     return AnalyzeCommand(
@@ -243,6 +274,7 @@ def _create_train_command(args: argparse.Namespace) -> TrainCommand:
 
 # 서브커맨드 팩토리 매핑
 COMMAND_FACTORY_MAP = {
+    "init": _create_init_command,
     "analyze": _create_analyze_command,
     "distill-tokenizer": _create_distill_command,
     "select": _create_select_command,

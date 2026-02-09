@@ -1,4 +1,5 @@
 """토큰 빈도 분석 커맨드"""
+
 from __future__ import annotations
 
 from pathlib import Path
@@ -15,8 +16,12 @@ class AnalyzeCommand(Command):
     def __init__(
         self,
         input_dir: Path = Path("artifacts/corpora/cleaned"),
-        output_sequences: Path = Path("artifacts/analysis/reports/bpe_token_id_sequences.txt"),
-        output_frequency: Path = Path("artifacts/analysis/reports/token_frequency.parquet"),
+        output_sequences: Path = Path(
+            "artifacts/analysis/reports/bpe_token_id_sequences.txt"
+        ),
+        output_frequency: Path = Path(
+            "artifacts/analysis/reports/token_frequency.parquet"
+        ),
         model_name: str = "openai-community/gpt2",
         workers: int = 0,
         chunk_size: int = 50,

@@ -1,4 +1,5 @@
 """토크나이저 증류 커맨드"""
+
 from __future__ import annotations
 
 from pathlib import Path
