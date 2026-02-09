@@ -46,6 +46,36 @@
 - 주석, 문서, 로그 메시지는 한국어로 작성한다.
 - 가독성 개선 목적의 이모지 사용을 허용한다.
 
+### Docstring 작성 규칙
+
+- **모든 모듈, 클래스, 공개 함수/메서드에 docstring을 작성한다.**
+- **Google 스타일 docstring**을 사용한다.
+- Docstring은 **한국어**로 작성한다.
+- 구조:
+  ```python
+  def example_function(param1: str, param2: int) -> bool:
+      """함수의 목적을 한 줄로 요약한다.
+
+      더 자세한 설명이 필요한 경우 빈 줄 이후 작성한다.
+
+      Args:
+          param1: 첫 번째 파라미터 설명
+          param2: 두 번째 파라미터 설명
+
+      Returns:
+          반환값 설명
+
+      Raises:
+          ValueError: 발생 가능한 예외 설명
+
+      Yields:
+          제너레이터의 경우 yield 값 설명
+      """
+  ```
+- 한 줄 요약은 마침표로 끝낸다.
+- 타입 정보는 타입 힌트에 이미 있으므로 docstring에 중복 작성하지 않는다.
+- TypedDict와 dataclass에는 Attributes 섹션을 추가한다.
+
 ## 정적 분석 및 품질 기준
 
 - Pyright 기반 정적 분석에서 타입 에러 0건을 유지한다.
