@@ -2,6 +2,7 @@ from __future__ import annotations
 
 import argparse
 import logging
+from pathlib import Path
 
 from pyfiglet import Figlet
 
@@ -183,9 +184,8 @@ def print_intro(logger: logging.Logger) -> None:
 
 def create_command(command_name: str, args: argparse.Namespace) -> Command:
     """커맨드 이름에 해당하는 Command 객체를 생성한다."""
-    from pathlib import Path
 
-    if command_name == "analyze":
+    def create_analyze_command(args: argparse.Namespace) -> AnalyzeCommand:
         return AnalyzeCommand(
             input_dir=Path(args.input_dir),
             output_sequences=Path(args.output_sequences),
@@ -195,7 +195,8 @@ def create_command(command_name: str, args: argparse.Namespace) -> Command:
             chunk_size=args.chunk_size,
             max_texts=args.max_texts,
         )
-    elif command_name == "distill-tokenizer":
+
+    def create_distill_command(args: argparse.Namespace) -> DistillCommand:
         return DistillCommand(
             original_tokenizer_dir=Path(args.original_tokenizer_dir),
             distilled_tokenizer_dir=Path(args.distilled_tokenizer_dir),
@@ -203,7 +204,8 @@ def create_command(command_name: str, args: argparse.Namespace) -> Command:
             vocab_size=args.vocab_size,
             model_name=args.model_name,
         )
-    elif command_name == "select":
+
+    def create_select_command(args: argparse.Namespace) -> SelectCommand:
         return SelectCommand(
             frequency_path=Path(args.frequency_path),
             sequences_path=Path(args.sequences_path),
@@ -213,19 +215,34 @@ def create_command(command_name: str, args: argparse.Namespace) -> Command:
             max_candidates=args.max_candidates,
             min_token_len=args.min_token_len,
         )
-    elif command_name == "remap":
+
+    def create_remap_command(args: argparse.Namespace) -> RemapCommand:
         return RemapCommand(
             distilled_tokenizer_dir=Path(args.distilled_tokenizer_dir),
             remapped_tokenizer_dir=Path(args.remapped_tokenizer_dir),
             remap_rules_path=Path(args.remap_rules_path),
             replacement_candidates_path=Path(args.replacement_candidates_path),
         )
-    elif command_name == "align":
+
+    def create_align_command(args: argparse.Namespace) -> AlignCommand:
         return AlignCommand()
-    elif command_name == "train":
+
+    def create_train_command(args: argparse.Namespace) -> TrainCommand:
         return TrainCommand()
-    else:
-        raise NotImplementedError(f"'{command_name}'는 유효하지 않은 커맨드입니다.")
+
+    command_factories = {
+        "analyze": create_analyze_command,
+        "distill-tokenizer": create_distill_command,
+        "select": create_select_command,
+        "remap": create_remap_command,
+        "align": create_align_command,
+        "train": create_train_command,
+    }
+
+    if command_name in command_factories:
+        return command_factories[command_name](args)
+
+    raise NotImplementedError(f"'{command_name}'는 유효하지 않은 커맨드입니다.")
 
 
 def dispatch(command_name: str, args: argparse.Namespace, logger: logging.Logger) -> None:
