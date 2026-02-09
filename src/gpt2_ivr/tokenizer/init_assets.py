@@ -44,7 +44,7 @@ def initialize_assets(
     Returns:
         초기화 결과 정보를 담은 딕셔너리
     """
-    logger.info("🚀 모델 초기화를 시작합니다: %s", model_name)
+    logger.info("모델 초기화 시작: %s", model_name)
 
     # 이미 토크나이저가 존재하는지 확인
     tokenizer_files = list(tokenizer_dir.glob("*")) if tokenizer_dir.exists() else []
@@ -54,12 +54,10 @@ def initialize_assets(
     )
 
     if has_tokenizer and not force:
-        logger.info("✅ 토크나이저가 이미 존재합니다: %s", tokenizer_dir)
-        tokenizer: PreTrainedTokenizerBase = AutoTokenizer.from_pretrained(
-            str(tokenizer_dir)
-        )
+        logger.info("기존 토크나이저 사용: %s", tokenizer_dir)
+        tokenizer: PreTrainedTokenizerBase = AutoTokenizer.from_pretrained(str(tokenizer_dir))
         vocab_size = len(tokenizer.get_vocab())
-        logger.info("  └─ vocab 크기: %d", vocab_size)
+        logger.info("vocab 크기: %d", vocab_size)
         return InitResult(
             tokenizer_dir=tokenizer_dir,
             vocab_size=vocab_size,
@@ -67,23 +65,20 @@ def initialize_assets(
         )
 
     # Hub에서 토크나이저 다운로드
-    logger.info("📥 Hugging Face Hub에서 토크나이저를 다운로드합니다: %s", model_name)
+    logger.info("Hugging Face Hub에서 토크나이저 다운로드: %s", model_name)
     tokenizer: PreTrainedTokenizerBase = AutoTokenizer.from_pretrained(model_name)
 
     tokenizer_dir.mkdir(parents=True, exist_ok=True)
     tokenizer.save_pretrained(str(tokenizer_dir))
 
     vocab_size = len(tokenizer.get_vocab())
-    logger.info("✅ 토크나이저 다운로드 완료: %s", tokenizer_dir)
-    logger.info("  └─ vocab 크기: %d", vocab_size)
+    logger.info("토크나이저 저장 완료: %s (vocab_size: %d)", tokenizer_dir, vocab_size)
 
     # 모델 설정 다운로드 (가중치는 제외, 설정만 저장)
-    logger.info("📥 모델 설정(config)을 다운로드합니다: %s", model_name)
+    logger.info("모델 설정 다운로드: %s", model_name)
     config = AutoConfig.from_pretrained(model_name)
     config.save_pretrained(str(tokenizer_dir))
-    logger.info("✅ 모델 설정 저장 완료: %s", tokenizer_dir)
-
-    logger.info("🎉 초기화 완료.")
+    logger.info("모델 설정 저장 완료")
     return InitResult(
         tokenizer_dir=tokenizer_dir,
         vocab_size=vocab_size,

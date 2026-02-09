@@ -194,7 +194,7 @@ def count_bigrams(
             for i in range(len(ids) - 1):
                 counter[(ids[i], ids[i + 1])] += 1
 
-    logger.info("고유 바이그램 %d개를 집계했습니다.", len(counter))
+    logger.info("고유 바이그램 %d개 집계 완료", len(counter))
     return counter
 
 
@@ -252,7 +252,7 @@ def discover_new_token_candidates(
             )
         )
 
-    logger.info("신규 토큰 후보 %d개를 선정했습니다.", len(candidates))
+    logger.info("신규 토큰 후보 %d개 선정 완료", len(candidates))
     return candidates
 
 
@@ -441,7 +441,7 @@ def select_replacement_candidates(
         raise FileNotFoundError(f"토큰 시퀀스 파일이 없습니다: {sequences_path}")
 
     # 1) 빈도 로드
-    logger.info("📊 토큰 빈도를 로드합니다: %s", frequency_path)
+    logger.info("토큰 빈도 로드: %s", frequency_path)
     freq = load_frequency(frequency_path)
     logger.info("빈도 데이터 로드 완료 (고유 토큰 %d개)", len(freq))
 
@@ -454,36 +454,36 @@ def select_replacement_candidates(
     if not has_tokenizer_files:
         raise FileNotFoundError(f"원본 토크나이저 파일이 없습니다: {tokenizer_dir}")
 
-    logger.info("🔤 GPT-2 토크나이저를 로드합니다: %s", tokenizer_dir)
+    logger.info("토크나이저 로드: %s", tokenizer_dir)
     tokenizer = GPT2Tokenizer.from_pretrained(str(tokenizer_dir))
 
     # 3) 보호 토큰 집합 구성
     protected_ids = get_protected_token_ids(tokenizer, min_token_len)
-    logger.info("🛡️ 보호 대상 토큰 %d개를 설정했습니다.", len(protected_ids))
+    logger.info("보호 토큰 %d개 설정", len(protected_ids))
 
     # 4) 희생 후보 선정
-    logger.info("📉 희생 후보를 선정합니다 (최대 %d개)...", max_candidates)
+    logger.info("희생 후보 선정 중 (최대 %d개)", max_candidates)
     sacrifices = select_sacrifice_candidates(
         freq, tokenizer, protected_ids, max_candidates
     )
-    logger.info("희생 후보 %d개를 선정했습니다.", len(sacrifices))
+    logger.info("희생 후보 %d개 선정 완료", len(sacrifices))
     if sacrifices:
         zero_freq_count = sum(1 for s in sacrifices if s.frequency == 0)
-        logger.info("  └─ 미출현(빈도 0) 토큰: %d개", zero_freq_count)
+        logger.info("미출현(빈도 0) 토큰: %d개", zero_freq_count)
 
     # 5) 바이그램 집계
-    logger.info("🔍 인접 토큰 바이그램을 집계합니다...")
+    logger.info("바이그램 집계 중")
     bigram_counts = count_bigrams(sequences_path, logger)
 
     # 6) 신규 토큰 후보 탐색
-    logger.info("🧩 신규 토큰 후보를 탐색합니다 (최대 %d개)...", max_candidates)
+    logger.info("신규 토큰 후보 탐색 중 (최대 %d개)", max_candidates)
     new_tokens = discover_new_token_candidates(
         bigram_counts, tokenizer, max_candidates, logger
     )
 
     # 7) 매칭
     pairs = match_candidates(sacrifices, new_tokens)
-    logger.info("✅ 교체 후보 %d쌍을 매칭했습니다.", len(pairs))
+    logger.info("교체 후보 %d쌍 매칭 완료", len(pairs))
 
     return (
         bigram_counts,

@@ -9,7 +9,12 @@ from __future__ import annotations
 import logging
 from typing import Any
 
+from rich.console import Console
+from rich.panel import Panel
+
 from gpt2_ivr.commands.base import Command
+
+console = Console()
 
 
 class TrainCommand(Command):
@@ -36,10 +41,15 @@ class TrainCommand(Command):
         Returns:
             실행 결과 딕셔너리 (status, message)
         """
-        self.logger.info("🚧 train 단계는 아직 구현 중입니다.")
-        self.logger.info(
-            "향후 `src/gpt2_ivr/training/train.py`를 통해 accelerate 기반 학습을 연결합니다."
-        )
+        message_text = """[yellow]train 단계는 아직 구현 중입니다.[/yellow]
+
+향후 [cyan]src/gpt2_ivr/training/train.py[/cyan]를 통해
+accelerate 기반 학습을 연결할 예정입니다."""
+
+        console.print()
+        console.print(Panel(message_text, title="train 단계", border_style="yellow"))
+        console.print()
+
         return {
             "status": "not_implemented",
             "message": "train 단계 구현이 필요합니다.",

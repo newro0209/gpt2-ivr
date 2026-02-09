@@ -56,9 +56,7 @@ def get_training_corpus(
         yield []
         return
 
-    logger.info(
-        "📚 %d개의 코퍼스 파일을 '%s'에서 읽어들입니다.", len(files), corpus_dir
-    )
+    logger.info("코퍼스 파일 %d개 로드 중: %s", len(files), corpus_dir)
     batch: list[str] = []
     for file_path in files:
         with open(file_path, "r", encoding="utf-8") as f:
@@ -92,7 +90,7 @@ def distill_unigram_tokenizer(
     Raises:
         Exception: 토크나이저 로드 또는 학습 실패 시
     """
-    logger.info("🚀 Unigram 토크나이저 Distillation을 시작합니다.")
+    logger.info("Unigram 토크나이저 증류 시작")
 
     # 1. GPT-2 BPE 토크나이저 로드
     tokenizer_files = (
@@ -116,10 +114,7 @@ def distill_unigram_tokenizer(
             PreTrainedTokenizerBase,
             AutoTokenizer.from_pretrained(str(original_tokenizer_dir)),
         )
-        logger.info(
-            "✅ 원본 GPT-2 토크나이저 로드 완료. (vocab_size: %d)",
-            len(original_tokenizer.get_vocab()),
-        )
+        logger.info("원본 토크나이저 로드 완료 (vocab_size: %d)", len(original_tokenizer.get_vocab()))
     except Exception as e:
         raise RuntimeError(
             f"원본 토크나이저 로드 실패: {original_tokenizer_dir}"
@@ -131,7 +126,7 @@ def distill_unigram_tokenizer(
     # 2. Unigram 토크나이저 초기화
     tokenizer = Tokenizer(models.Unigram())
     tokenizer.pre_tokenizer = pre_tokenizers.ByteLevel(add_prefix_space=False)
-    logger.info("✨ Unigram 토크나이저와 ByteLevel PreTokenizer 설정 완료.")
+    logger.info("Unigram 모델 및 ByteLevel PreTokenizer 초기화 완료")
 
     # 3. 트레이너 설정
     special_tokens = original_tokenizer.all_special_tokens
@@ -143,26 +138,18 @@ def distill_unigram_tokenizer(
     trainer = trainers.UnigramTrainer(
         vocab_size=vocab_size, special_tokens=special_tokens, unk_token=unk_token
     )
-    logger.info(
-        "⚙️ UnigramTrainer 설정 완료. (vocab_size: %d, special_tokens: %s)",
-        vocab_size,
-        special_tokens,
-    )
+    logger.info("UnigramTrainer 설정 (vocab_size: %d, special_tokens: %s)", vocab_size, special_tokens)
 
     # 4. 코퍼스를 사용하여 토크나이저 학습
-    logger.info("📚 코퍼스 디렉토리 '%s'에서 토크나이저 학습을 시작합니다.", corpus_dir)
-    tokenizer.train_from_iterator(
-        get_training_corpus(corpus_dir, batch_size=10000), trainer=trainer
-    )
-    logger.info("✅ Unigram 토크나이저 학습 완료.")
+    logger.info("토크나이저 학습 시작: %s", corpus_dir)
+    tokenizer.train_from_iterator(get_training_corpus(corpus_dir, batch_size=10000), trainer=trainer)
+    logger.info("토크나이저 학습 완료")
 
     # 5. Distilled Unigram 토크나이저 저장
     distilled_tokenizer_dir.mkdir(parents=True, exist_ok=True)
     tokenizer_json_path = distilled_tokenizer_dir / "tokenizer.json"
     tokenizer.save(str(tokenizer_json_path))
-    logger.info(
-        "💾 Distilled Unigram 토크나이저를 '%s'에 저장했습니다.", tokenizer_json_path
-    )
+    logger.info("증류 토크나이저 저장: %s", tokenizer_json_path)
 
     # Hugging Face PreTrainedTokenizerFast와 호환되도록 추가 파일 생성
     hf_tokenizer = PreTrainedTokenizerFast(
@@ -174,12 +161,7 @@ def distill_unigram_tokenizer(
         pad_token=original_tokenizer.pad_token,
     )
     hf_tokenizer.save_pretrained(distilled_tokenizer_dir)
-    logger.info(
-        "📄 Hugging Face `PreTrainedTokenizerFast` 호환 파일을 '%s'에 저장했습니다.",
-        distilled_tokenizer_dir,
-    )
-
-    logger.info("🎉 Unigram 토크나이저 Distillation 단계 완료.")
+    logger.info("PreTrainedTokenizerFast 호환 파일 저장: %s", distilled_tokenizer_dir)
 
     return DistillResult(
         output_dir=distilled_tokenizer_dir,

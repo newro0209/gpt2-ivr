@@ -10,12 +10,17 @@ import logging
 from pathlib import Path
 from typing import Any
 
+from rich.console import Console
+from rich.panel import Panel
+
 from gpt2_ivr.commands.base import Command
 from gpt2_ivr.embedding import (
     extract_embeddings,
     initialize_new_token_embeddings,
     reorder_embeddings,
 )
+
+console = Console()
 
 
 class AlignCommand(Command):
@@ -63,12 +68,9 @@ class AlignCommand(Command):
         Returns:
             실행 결과 딕셔너리 (status, extract_result, reorder_result, init_result, embeddings_dir)
         """
-        self.logger.info("🚀 align 단계를 시작합니다.")
-
         # 1. 원본 모델에서 임베딩 추출
-        self.logger.info("=" * 60)
-        self.logger.info("1단계: 원본 모델 임베딩 추출")
-        self.logger.info("=" * 60)
+        console.print()
+        console.print(Panel("[bold cyan]1단계: 원본 모델 임베딩 추출[/bold cyan]", border_style="blue"))
 
         extract_result = extract_embeddings(
             model_name=self.model_name,
@@ -77,9 +79,8 @@ class AlignCommand(Command):
         )
 
         # 2. Remap 규칙에 따라 임베딩 재정렬
-        self.logger.info("=" * 60)
-        self.logger.info("2단계: 임베딩 재정렬")
-        self.logger.info("=" * 60)
+        console.print()
+        console.print(Panel("[bold cyan]2단계: 임베딩 재정렬[/bold cyan]", border_style="blue"))
 
         reorder_result = reorder_embeddings(
             original_wte_path=extract_result["wte"],
@@ -91,9 +92,8 @@ class AlignCommand(Command):
         )
 
         # 3. 신규 토큰 임베딩 초기화
-        self.logger.info("=" * 60)
-        self.logger.info("3단계: 신규 토큰 임베딩 초기화")
-        self.logger.info("=" * 60)
+        console.print()
+        console.print(Panel("[bold cyan]3단계: 신규 토큰 임베딩 초기화[/bold cyan]", border_style="blue"))
 
         init_result = initialize_new_token_embeddings(
             aligned_wte_path=reorder_result["aligned_wte"],
@@ -105,9 +105,15 @@ class AlignCommand(Command):
             logger=self.logger,
         )
 
-        self.logger.info("=" * 60)
-        self.logger.info("✅ align 단계가 완료되었습니다.")
-        self.logger.info("=" * 60)
+        # 결과 요약 출력
+        result_text = f"""[bold green]임베딩 정렬 완료[/bold green]
+
+[yellow]임베딩 디렉토리:[/yellow] {self.embeddings_output_dir}
+[yellow]초기화 전략:[/yellow] {self.init_strategy}"""
+
+        console.print()
+        console.print(Panel(result_text, title="align 단계 완료", border_style="green"))
+        console.print()
 
         return {
             "status": "success",

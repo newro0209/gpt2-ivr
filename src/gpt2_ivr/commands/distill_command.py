@@ -9,9 +9,14 @@ from __future__ import annotations
 from pathlib import Path
 from typing import Any
 
+from rich.console import Console
+from rich.panel import Panel
+
 from gpt2_ivr.tokenizer import distill_unigram_tokenizer
 
 from .base import Command
+
+console = Console()
 
 
 class DistillCommand(Command):
@@ -50,6 +55,17 @@ class DistillCommand(Command):
             distilled_tokenizer_dir=self.distilled_tokenizer_dir,
             corpus_dir=self.corpus_dir,
         )
+
+        # Rich 패널로 결과 출력
+        result_text = f"""[bold cyan]토크나이저 증류 완료[/bold cyan]
+
+[yellow]저장 경로:[/yellow] {result['output_dir']}
+[yellow]원본 vocab 크기:[/yellow] {result['original_vocab_size']:,}
+[yellow]증류 vocab 크기:[/yellow] {result['vocab_size']:,}"""
+
+        console.print()
+        console.print(Panel(result_text, title="토크나이저 증류 완료", border_style="green"))
+        console.print()
 
         return {
             "output_dir": result["output_dir"],

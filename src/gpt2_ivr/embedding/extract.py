@@ -32,18 +32,14 @@ def extract_embeddings(
     if logger is None:
         logger = logging.getLogger("gpt2_ivr.embedding.extract")
 
-    logger.info("🔍 모델 로딩 중: %s", model_name)
+    logger.info("모델 로딩: %s", model_name)
     model = GPT2LMHeadModel.from_pretrained(model_name, local_files_only=True)
 
     # 임베딩 추출
-    wte = model.transformer.wte.weight.data.clone()  # Token embeddings
-    wpe = model.transformer.wpe.weight.data.clone()  # Position embeddings
+    wte = model.transformer.wte.weight.data.clone()
+    wpe = model.transformer.wpe.weight.data.clone()
 
-    logger.info(
-        "✅ 임베딩 추출 완료 - wte shape: %s, wpe shape: %s",
-        wte.shape,
-        wpe.shape,
-    )
+    logger.info("임베딩 추출 완료 (wte: %s, wpe: %s)", wte.shape, wpe.shape)
 
     # 출력 디렉토리 생성
     output_dir.mkdir(parents=True, exist_ok=True)
@@ -55,8 +51,7 @@ def extract_embeddings(
     torch.save(wte, wte_path)
     torch.save(wpe, wpe_path)
 
-    logger.info("💾 Token embedding 저장: %s", wte_path)
-    logger.info("💾 Position embedding 저장: %s", wpe_path)
+    logger.info("임베딩 저장 완료 (wte: %s, wpe: %s)", wte_path, wpe_path)
 
     # 메타데이터 저장
     metadata = {
@@ -72,7 +67,7 @@ def extract_embeddings(
     with open(metadata_path, "w", encoding="utf-8") as f:
         json.dump(metadata, f, indent=2, ensure_ascii=False)
 
-    logger.info("📋 메타데이터 저장: %s", metadata_path)
+    logger.info("메타데이터 저장: %s", metadata_path)
 
     return {
         "wte": wte_path,

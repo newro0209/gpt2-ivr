@@ -11,7 +11,10 @@ from collections import Counter
 from pathlib import Path
 from typing import Any
 
+from rich.console import Console
+from rich.panel import Panel
 from rich.progress import track
+from rich.table import Table
 
 from gpt2_ivr.analysis.token_frequency import (
     analyze_token_frequency,
@@ -21,6 +24,7 @@ from gpt2_ivr.analysis.token_frequency import (
 from .base import Command
 
 logger = logging.getLogger(__name__)
+console = Console()
 
 
 class AnalyzeCommand(Command):
@@ -102,11 +106,19 @@ class AnalyzeCommand(Command):
         total_tokens = sum(counter.values())
         unique_tokens = len(counter)
 
-        logger.info("✅ 토큰 빈도 분석 완료")
-        logger.info("  └─ 총 토큰: %d개", total_tokens)
-        logger.info("  └─ 고유 토큰: %d개", unique_tokens)
-        logger.info("📄 토큰 빈도 저장: %s", self.output_frequency)
-        logger.info("📄 토큰 시퀀스 저장: %s", self.output_sequences)
+        # Rich 테이블로 결과 출력
+        table = Table(title="토큰 빈도 분석 결과", show_header=False, title_style="bold green")
+        table.add_column("항목", style="cyan", width=20)
+        table.add_column("값", style="yellow")
+
+        table.add_row("총 토큰", f"{total_tokens:,}개")
+        table.add_row("고유 토큰", f"{unique_tokens:,}개")
+        table.add_row("빈도 파일", str(self.output_frequency))
+        table.add_row("시퀀스 파일", str(self.output_sequences))
+
+        console.print()
+        console.print(table)
+        console.print()
 
         return {
             "sequences_path": self.output_sequences,

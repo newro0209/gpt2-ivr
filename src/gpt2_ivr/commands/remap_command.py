@@ -12,9 +12,13 @@ from typing import Any
 
 import pandas as pd
 import yaml
+from rich.console import Console
+from rich.panel import Panel
 from tokenizers import Tokenizer
 
 from gpt2_ivr.commands.base import Command
+
+console = Console()
 
 
 class RemapCommand(Command):
@@ -60,8 +64,6 @@ class RemapCommand(Command):
             FileNotFoundError: 증류 토크나이저 또는 재할당 규칙 파일이 없는 경우
             ValueError: 재할당 규칙 형식이 올바르지 않은 경우
         """
-        self.logger.info("🚀 remap 단계를 시작합니다.")
-
         # 1. 증류 토크나이저 로드
         if not self.distilled_tokenizer_path.exists():
             raise FileNotFoundError(
@@ -178,11 +180,18 @@ class RemapCommand(Command):
         self.remapped_tokenizer_path.mkdir(parents=True, exist_ok=True)
         tokenizer.save(str(self.remapped_tokenizer_path / "tokenizer.json"))
 
-        self.logger.info(
-            "재할당 토크나이저 저장: %s",
-            self.remapped_tokenizer_path / "tokenizer.json",
-        )
-        self.logger.info("✅ remap 단계가 완료되었습니다.")
+        # Rich 패널로 결과 출력
+        result_text = f"""[bold cyan]재할당 토크나이저 저장 완료[/bold cyan]
+
+[yellow]경로:[/yellow] {self.remapped_tokenizer_path / "tokenizer.json"}
+[yellow]이전 vocab 크기:[/yellow] {current_vocab_size:,}
+[yellow]현재 vocab 크기:[/yellow] {tokenizer.get_vocab_size():,}
+[yellow]추가된 토큰:[/yellow] {len(new_tokens_to_add):,}개"""
+
+        console.print()
+        console.print(Panel(result_text, title="토큰 재할당 완료", border_style="green"))
+        console.print()
+
         return {
             "status": "success",
             "remapped_tokenizer_path": str(self.remapped_tokenizer_path),

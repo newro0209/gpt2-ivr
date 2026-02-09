@@ -10,7 +10,8 @@ import logging
 from pathlib import Path
 from typing import Any
 
-from rich.progress import track
+from rich.console import Console
+from rich.table import Table
 
 from gpt2_ivr.analysis.candidate_selection import (
     select_replacement_candidates,
@@ -21,6 +22,7 @@ from gpt2_ivr.analysis.candidate_selection import (
 from .base import Command
 
 logger = logging.getLogger(__name__)
+console = Console()
 
 
 class SelectCommand(Command):
@@ -83,32 +85,32 @@ class SelectCommand(Command):
             min_token_len=self.min_token_len,
         )
 
-        # 5) 바이그램 집계 (트래킹 추가)
-        # select_replacement_candidates 내부에서 bigram_counts가 이미 계산되었으므로,
-        # 여기서는 단순히 logger.info만 출력합니다.
-        # track은 이미 도메인 함수에서 제거되었으므로, 여기서 track을 감쌀 필요는 없습니다.
-        # bigram_counts는 Counter 객체이므로 iterable이 아닙니다.
-        logger.info("고유 바이그램 %d개를 집계했습니다.", len(bigram_counts))
-
-        # 6) 신규 토큰 후보 탐색 (트래킹 추가)
-        # new_tokens_list도 이미 계산된 리스트이므로, 여기서 track을 감쌀 필요는 없습니다.
-        logger.info("신규 토큰 후보 %d개를 선정했습니다.", len(new_tokens_list))
-
-        # 8) 결과 저장
+        # 결과 저장
         write_replacement_csv(pairs, self.output_csv)
-        logger.info("📄 교체 후보 CSV 저장 완료: %s", self.output_csv)
-
         write_selection_log(
             pairs=pairs,
             total_vocab=tokenizer.vocab_size,
-            total_protected=len(
-                sacrifices
-            ),  # Corrected from protected_ids to sacrifices
-            total_sacrifice_pool=tokenizer.vocab_size - len(sacrifices),  # Corrected
+            total_protected=len(sacrifices),
+            total_sacrifice_pool=tokenizer.vocab_size - len(sacrifices),
             total_bigrams=len(bigram_counts),
             output_path=self.output_log,
         )
-        logger.info("📝 선정 로그 저장 완료: %s", self.output_log)
+
+        # Rich 테이블로 결과 출력
+        table = Table(title="교체 후보 선정 결과", show_header=False, title_style="bold green")
+        table.add_column("항목", style="cyan", width=20)
+        table.add_column("값", style="yellow")
+
+        table.add_row("교체 후보 쌍", f"{len(pairs):,}개")
+        table.add_row("희생 후보", f"{len(sacrifices):,}개")
+        table.add_row("신규 토큰 후보", f"{len(new_tokens_list):,}개")
+        table.add_row("고유 바이그램", f"{len(bigram_counts):,}개")
+        table.add_row("CSV 파일", str(self.output_csv))
+        table.add_row("로그 파일", str(self.output_log))
+
+        console.print()
+        console.print(table)
+        console.print()
 
         return {
             "pairs_count": len(pairs),

@@ -9,10 +9,15 @@ from __future__ import annotations
 from pathlib import Path
 from typing import Any
 
+from rich.console import Console
+from rich.table import Table
+
 from gpt2_ivr.corpus.normalize import normalize_raw_corpora
 from gpt2_ivr.tokenizer import initialize_assets
 
 from .base import Command
+
+console = Console()
 
 
 class InitCommand(Command):
@@ -74,6 +79,21 @@ class InitCommand(Command):
             encoding=self.encoding,
             force=self.normalize_force,
         )
+
+        # Rich 테이블로 결과 출력
+        table = Table(title="초기화 완료", show_header=False, title_style="bold green")
+        table.add_column("항목", style="cyan", width=20)
+        table.add_column("값", style="yellow")
+
+        table.add_row("모델", result["model_name"])
+        table.add_row("토크나이저 경로", str(result["tokenizer_dir"]))
+        table.add_row("vocab 크기", f"{result['vocab_size']:,}")
+        table.add_row("정제된 코퍼스", f"{len(normalized_corpora):,}개")
+        table.add_row("코퍼스 경로", str(self.cleaned_corpora_dir))
+
+        console.print()
+        console.print(table)
+        console.print()
 
         return {
             "tokenizer_dir": result["tokenizer_dir"],
