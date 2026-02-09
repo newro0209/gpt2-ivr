@@ -18,7 +18,7 @@ class AnalyzeCommand(Command):
         input_dir: Path,
         output_sequences: Path,
         output_frequency: Path,
-        model_name: str,
+        tokenizer_dir: Path,
         workers: int,
         chunk_size: int,
         max_texts: int,
@@ -28,7 +28,7 @@ class AnalyzeCommand(Command):
         self.input_dir = input_dir
         self.output_sequences = output_sequences
         self.output_frequency = output_frequency
-        self.model_name = model_name
+        self.tokenizer_dir = tokenizer_dir
         self.workers = workers
         self.chunk_size = chunk_size
         self.max_texts = max_texts
@@ -42,7 +42,7 @@ class AnalyzeCommand(Command):
             inputs=[],
             output_sequences=self.output_sequences,
             output_frequency=self.output_frequency,
-            model_name=self.model_name,
+            tokenizer_dir=self.tokenizer_dir,
             workers=self.workers,
             chunk_size=self.chunk_size,
             max_texts=self.max_texts,

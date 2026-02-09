@@ -14,10 +14,13 @@ from pathlib import Path
 from typing import TypedDict, cast
 
 import pyarrow.parquet as pq
-from tqdm import tqdm
 from transformers import GPT2Tokenizer
 
-from gpt2_ivr.utils.logging_config import get_logger
+from gpt2_ivr.utils.logging_config import (
+    create_byte_progress,
+    create_progress,
+    get_logger,
+)
 
 logger = get_logger(__name__)
 
@@ -151,14 +154,11 @@ def count_bigrams(
 
     file_size = sequences_path.stat().st_size
     with sequences_path.open("r", encoding="utf-8") as handle:
-        with tqdm(
-            total=file_size,
-            desc="🔍 바이그램 집계",
-            unit="B",
-            unit_scale=True,
-        ) as pbar:
+        total = file_size if file_size > 0 else None
+        with create_byte_progress() as progress:
+            task_id = progress.add_task("🔍 바이그램 집계", total=total)
             for line in handle:
-                pbar.update(len(line.encode("utf-8")))
+                progress.advance(task_id, len(line.encode("utf-8")))
                 parts = line.split()
                 if len(parts) < 2:
                     continue
@@ -188,39 +188,38 @@ def discover_new_token_candidates(
     seen_merged: set[str] = set()
     candidates: list[NewTokenCandidate] = []
 
-    for (left_id, right_id), freq in tqdm(
-        top_bigrams,
-        desc="🧩 신규 토큰 후보 탐색",
-        unit="쌍",
-    ):
-        if len(candidates) >= max_candidates:
-            break
+    with create_progress() as progress:
+        task_id = progress.add_task("🧩 신규 토큰 후보 탐색", total=None)
+        for (left_id, right_id), freq in top_bigrams:
+            progress.advance(task_id)
+            if len(candidates) >= max_candidates:
+                break
 
-        # 바이그램 디코딩 → 병합 문자열
-        merged_str = cast(str, tokenizer.decode([left_id, right_id]))
+            # 바이그램 디코딩 → 병합 문자열
+            merged_str = cast(str, tokenizer.decode([left_id, right_id]))
 
-        # 빈 문자열 또는 공백만 있는 경우 제외
-        if not merged_str.strip():
-            continue
+            # 빈 문자열 또는 공백만 있는 경우 제외
+            if not merged_str.strip():
+                continue
 
-        # 동일 병합 문자열 중복 제외
-        if merged_str in seen_merged:
-            continue
+            # 동일 병합 문자열 중복 제외
+            if merged_str in seen_merged:
+                continue
 
-        # 이미 단일 토큰으로 존재하면 제외
-        encoded: list[int] = tokenizer.encode(merged_str, add_special_tokens=False)
-        if len(encoded) <= 1:
-            continue
+            # 이미 단일 토큰으로 존재하면 제외
+            encoded: list[int] = tokenizer.encode(merged_str, add_special_tokens=False)
+            if len(encoded) <= 1:
+                continue
 
-        seen_merged.add(merged_str)
-        candidates.append(
-            NewTokenCandidate(
-                merged_str=merged_str,
-                left_id=left_id,
-                right_id=right_id,
-                bigram_freq=freq,
+            seen_merged.add(merged_str)
+            candidates.append(
+                NewTokenCandidate(
+                    merged_str=merged_str,
+                    left_id=left_id,
+                    right_id=right_id,
+                    bigram_freq=freq,
+                )
             )
-        )
 
     logger.info("신규 토큰 후보 %d개를 선정했습니다.", len(candidates))
     return candidates
@@ -362,7 +361,7 @@ def select_replacement_candidates(
     sequences_path: Path,
     output_csv: Path,
     output_log: Path,
-    model_name: str,
+    tokenizer_dir: Path,
     max_candidates: int,
     min_token_len: int,
 ) -> SelectionResult:
@@ -373,7 +372,7 @@ def select_replacement_candidates(
         sequences_path: BPE 토큰 시퀀스 파일 경로
         output_csv: 교체 후보 CSV 저장 경로
         output_log: 선정 로그 저장 경로
-        model_name: 사용할 토크나이저 모델명
+        tokenizer_dir: 원본 토크나이저 디렉토리
         max_candidates: 최대 후보 개수
         min_token_len: 보호 토큰 최소 길이
 
@@ -381,7 +380,7 @@ def select_replacement_candidates(
         선정 결과 정보를 담은 딕셔너리
 
     Raises:
-        FileNotFoundError: 입력 파일이 존재하지 않는 경우
+        FileNotFoundError: 입력 파일 또는 원본 토크나이저가 없는 경우
     """
     # 입력 파일 검증
     if not frequency_path.exists():
@@ -395,8 +394,16 @@ def select_replacement_candidates(
     logger.info("빈도 데이터 로드 완료 (고유 토큰 %d개)", len(freq))
 
     # 2) 토크나이저 로드
-    logger.info("🔤 GPT-2 토크나이저를 로드합니다: %s", model_name)
-    tokenizer = GPT2Tokenizer.from_pretrained(model_name)
+    tokenizer_files = list(tokenizer_dir.glob("*")) if tokenizer_dir.exists() else []
+    has_tokenizer_files = any(
+        f.name in ["tokenizer.json", "vocab.json", "merges.txt"]
+        for f in tokenizer_files
+    )
+    if not has_tokenizer_files:
+        raise FileNotFoundError(f"원본 토크나이저 파일이 없습니다: {tokenizer_dir}")
+
+    logger.info("🔤 GPT-2 토크나이저를 로드합니다: %s", tokenizer_dir)
+    tokenizer = GPT2Tokenizer.from_pretrained(str(tokenizer_dir))
 
     # 3) 보호 토큰 집합 구성
     protected_ids = get_protected_token_ids(tokenizer, min_token_len)

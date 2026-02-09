@@ -11,10 +11,9 @@ from typing import Iterable, Iterator, TypedDict, cast
 
 import pyarrow as pa
 import pyarrow.parquet as pq
-from tqdm import tqdm
 from transformers import BatchEncoding, GPT2Tokenizer
 
-from gpt2_ivr.utils.logging_config import get_logger
+from gpt2_ivr.utils.logging_config import create_progress, get_logger
 
 logger = get_logger(__name__)
 
@@ -130,16 +129,16 @@ def collect_statistics(
     with output_sequences.open("w", encoding="utf-8") as handle:
         # 청크 스레드 병렬 처리
         with ThreadPoolExecutor(max_workers=workers) as executor:
-            for chunk_ids in tqdm(
-                executor.map(encode_chunk, chunk_iter(texts)),
-                desc="토큰화",
-                unit="청크",
-            ):
-                # 청크 결과 누적 및 기록
-                for token_ids in chunk_ids:
-                    counter.update(token_ids)
-                    handle.write(" ".join(str(token_id) for token_id in token_ids))
-                    handle.write("\n")
+            with create_progress() as progress:
+                task_id = progress.add_task("🔍 토큰화", total=None)
+                for chunk_ids in executor.map(encode_chunk, chunk_iter(texts)):
+                    progress.advance(task_id)
+
+                    # 청크 결과 누적 및 기록
+                    for token_ids in chunk_ids:
+                        counter.update(token_ids)
+                        handle.write(" ".join(str(token_id) for token_id in token_ids))
+                        handle.write("\n")
 
     return counter
 
@@ -149,7 +148,7 @@ def analyze_token_frequency(
     inputs: list[Path],
     output_sequences: Path,
     output_frequency: Path,
-    model_name: str,
+    tokenizer_dir: Path,
     text_key: str,
     workers: int,
     chunk_size: int,
@@ -163,10 +162,10 @@ def analyze_token_frequency(
         inputs: 개별 입력 파일 목록
         output_sequences: BPE 토큰 시퀀스 출력 경로
         output_frequency: 토큰 빈도 parquet 출력 경로
-        model_name: GPT-2 모델 이름
+        tokenizer_dir: 원본 토크나이저 디렉토리
         text_key: json/jsonl 텍스트 키
-        workers: 스레드 워커 수 (0이면 CPU * 2)
-        chunk_size: 스레드 청크 크기
+        workers: 스레드 워커 수 (0이면 CPU - 1)
+        chunk_size: 스레드 청크 크기 (0이면 자동 설정)
         max_texts: 처리할 최대 텍스트 수 (0이면 전체)
         encoding: 입력 파일 인코딩
 
@@ -174,6 +173,7 @@ def analyze_token_frequency(
         분석 결과 정보를 담은 딕셔너리
 
     Raises:
+        FileNotFoundError: 원본 토크나이저 파일이 없는 경우
         SystemExit: 입력 파일을 찾을 수 없는 경우
     """
     # 입력 파일 목록 수집
@@ -190,12 +190,24 @@ def analyze_token_frequency(
         logger.info("⚠️  최대 %d개 텍스트만 처리합니다.", max_texts)
 
     # 토크나이저 로드
-    logger.info("🔤 GPT-2 토크나이저를 로드합니다: %s", model_name)
-    tokenizer = GPT2Tokenizer.from_pretrained(model_name)
+    tokenizer_files = list(tokenizer_dir.glob("*")) if tokenizer_dir.exists() else []
+    has_tokenizer_files = any(
+        f.name in ["tokenizer.json", "vocab.json", "merges.txt"]
+        for f in tokenizer_files
+    )
+    if not has_tokenizer_files:
+        raise FileNotFoundError(f"원본 토크나이저 파일이 없습니다: {tokenizer_dir}")
+
+    logger.info("🔤 GPT-2 토크나이저를 로드합니다: %s", tokenizer_dir)
+    tokenizer = GPT2Tokenizer.from_pretrained(str(tokenizer_dir))
 
     # 워커 수 계산
     if workers <= 0:
-        workers = max(1, int((os.cpu_count() or 1) * 2))
+        workers = max(1, (os.cpu_count() or 1) - 1)  # 1개는 남겨둠
+
+    # 청크 크기 계산
+    if chunk_size <= 0:
+        chunk_size = workers * 32
 
     logger.info("🔧 토큰화 설정: workers=%d, chunk_size=%d", workers, chunk_size)
 

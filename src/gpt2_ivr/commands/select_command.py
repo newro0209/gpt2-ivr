@@ -19,7 +19,7 @@ class SelectCommand(Command):
         sequences_path: Path,
         output_csv: Path,
         output_log: Path,
-        model_name: str,
+        tokenizer_dir: Path,
         max_candidates: int,
         min_token_len: int,
     ):
@@ -27,7 +27,7 @@ class SelectCommand(Command):
         self.sequences_path = sequences_path
         self.output_csv = output_csv
         self.output_log = output_log
-        self.model_name = model_name
+        self.tokenizer_dir = tokenizer_dir
         self.max_candidates = max_candidates
         self.min_token_len = min_token_len
 
@@ -38,7 +38,7 @@ class SelectCommand(Command):
             sequences_path=self.sequences_path,
             output_csv=self.output_csv,
             output_log=self.output_log,
-            model_name=self.model_name,
+            tokenizer_dir=self.tokenizer_dir,
             max_candidates=self.max_candidates,
             min_token_len=self.min_token_len,
         )

@@ -1,4 +1,4 @@
-"""Tokenizer Remapping Command"""
+"""토크나이저 재할당 커맨드"""
 
 from __future__ import annotations
 
@@ -15,7 +15,7 @@ from gpt2_ivr.utils.logging_config import get_logger
 
 
 class RemapCommand(Command):
-    """Remap Command"""
+    """토큰 재할당 규칙 적용 커맨드"""
 
     def __init__(
         self,
@@ -32,68 +32,70 @@ class RemapCommand(Command):
 
     def execute(self, **kwargs: Any) -> dict[str, Any]:
         """커맨드 실행 로직"""
-        self.logger.info("Executing Remap Command...")
+        self.logger.info("🚀 remap 단계를 시작합니다.")
 
-        # 1. Load distilled tokenizer
+        # 1. 증류 토크나이저 로드
         if not self.distilled_tokenizer_path.exists():
-            self.logger.error(
-                "Distilled tokenizer not found at %s. "
-                "Please run 'uv run ivr distill-tokenizer' first.",
-                self.distilled_tokenizer_path,
+            raise FileNotFoundError(
+                "증류 토크나이저를 찾을 수 없습니다. "
+                f"먼저 `uv run ivr distill-tokenizer`를 실행하세요: "
+                f"{self.distilled_tokenizer_path}"
             )
-            return {"status": "failed", "message": "Distilled tokenizer missing"}
 
-        self.logger.info(
-            "Loading distilled tokenizer from %s", self.distilled_tokenizer_path
-        )
+        self.logger.info("증류 토크나이저 로드: %s", self.distilled_tokenizer_path)
         tokenizer = Tokenizer.from_file(
             str(self.distilled_tokenizer_path / "tokenizer.json")
         )
 
-        # 2. Load replacement candidates (optional, for logging/info)
+        # 2. 교체 후보 로드 (선택, 로그 정보용)
         if self.replacement_candidates_path.exists():
             candidates_df = pd.read_csv(self.replacement_candidates_path)
             self.logger.info(
-                "Loaded %d replacement candidates from %s",
+                "교체 후보 %d개 로드: %s",
                 len(candidates_df),
                 self.replacement_candidates_path,
             )
-            # self.logger.debug("Candidates: \n%s", candidates_df.head())
+            # self.logger.debug("교체 후보 샘플:\n%s", candidates_df.head())
         else:
             self.logger.warning(
-                "Replacement candidates file not found at %s. "
-                "Skipping candidate-based logging.",
+                "교체 후보 CSV가 없어 상세 로그를 생략합니다: %s",
                 self.replacement_candidates_path,
             )
 
-        # 3. Load remap rules
+        # 3. 재할당 규칙 로드
         if not self.remap_rules_path.exists():
-            self.logger.error(
-                "Remap rules file not found at %s. Cannot perform remapping.",
-                self.remap_rules_path,
-            )
-            return {"status": "failed", "message": "Remap rules missing"}
-
-        with open(self.remap_rules_path, "r", encoding="utf-8") as f:
-            remap_rules = yaml.safe_load(f)
-            if not remap_rules:
-                self.logger.warning(
-                    "No remap rules found in %s.", self.remap_rules_path
-                )
-                remap_rules = {}
-            self.logger.info(
-                "Loaded %d remap rules from %s",
-                len(remap_rules),
-                self.remap_rules_path,
+            raise FileNotFoundError(
+                "재할당 규칙 파일을 찾을 수 없습니다: " f"{self.remap_rules_path}"
             )
 
-        # 4. Apply remapping
-        # This is a simplified example. Actual IVR remapping involves
-        # more complex logic to manage token IDs and vocabulary.
-        # For this implementation, we'll simulate adding new tokens and
-        # potentially updating existing ones.
+        with self.remap_rules_path.open("r", encoding="utf-8") as handle:
+            loaded_rules = yaml.safe_load(handle)
+
+        if loaded_rules is None:
+            self.logger.warning(
+                "재할당 규칙이 비어 있습니다: %s", self.remap_rules_path
+            )
+            remap_rules: dict[str, str] = {}
+        elif isinstance(loaded_rules, dict):
+            remap_rules = loaded_rules
+        else:
+            raise ValueError(
+                "재할당 규칙 형식이 올바르지 않습니다. "
+                "YAML 매핑(dict) 형식이어야 합니다."
+            )
+
+        self.logger.info(
+            "재할당 규칙 %d개 로드: %s",
+            len(remap_rules),
+            self.remap_rules_path,
+        )
+
+        # 4. 재할당 규칙 적용
+        # 현재 구현은 단순화된 형태이며, 실제 IVR에서는
+        # 토큰 ID/어휘 재배치를 더 정교하게 다룰 필요가 있다.
+        # 여기서는 신규 토큰 추가 중심으로 동작한다.
         current_vocab_size = tokenizer.get_vocab_size()
-        self.logger.info("Current tokenizer vocab size: %d", current_vocab_size)
+        self.logger.info("현재 토크나이저 vocab 크기: %d", current_vocab_size)
 
         new_tokens_to_add = []
         for old_token, new_token in remap_rules.items():
@@ -101,39 +103,32 @@ class RemapCommand(Command):
             new_id = tokenizer.token_to_id(new_token)
 
             if old_id is None and new_id is None:
-                # Both are new, add new_token
+                # 양쪽 모두 신규 토큰인 경우
                 new_tokens_to_add.append(new_token)
                 self.logger.info(
-                    "Rule: '%s' -> '%s'. Both are new. Will add '%s' later.",
+                    "규칙: '%s' -> '%s' (신규 토큰 추가 예정)",
                     old_token,
-                    new_token,
                     new_token,
                 )
             elif old_id is not None and new_id is None:
-                # Old token exists, new token is new.
-                # In a real IVR, we'd assign old_id to new_token.
-                # For this simplified example, we just add new_token.
+                # 기존 토큰은 있고 신규 토큰은 없는 경우
                 new_tokens_to_add.append(new_token)
                 self.logger.info(
-                    "Rule: '%s' (id:%d) -> '%s'. '%s' is new. Will add '%s' later.",
+                    "규칙: '%s'(id:%d) -> '%s' (신규 토큰 추가 예정)",
                     old_token,
                     old_id,
-                    new_token,
-                    new_token,
                     new_token,
                 )
             elif old_id is None and new_id is not None:
                 self.logger.warning(
-                    "Rule: '%s' -> '%s' (id:%d). '%s' is new but target '%s' already exists. Skipping.",
+                    "규칙 무시: '%s' -> '%s'(id:%d), 대상 토큰이 이미 존재합니다.",
                     old_token,
                     new_token,
                     new_id,
-                    old_token,
-                    new_token,
                 )
-            else:  # old_id is not None and new_id is not None
+            else:  # 양쪽 모두 기존 토큰인 경우
                 self.logger.info(
-                    "Rule: '%s' (id:%d) -> '%s' (id:%d). Both exist. No change for now.",
+                    "규칙: '%s'(id:%d) -> '%s'(id:%d), 기존 토큰 유지",
                     old_token,
                     old_id,
                     new_token,
@@ -141,26 +136,25 @@ class RemapCommand(Command):
                 )
 
         if new_tokens_to_add:
+            self.logger.info("신규 토큰 %d개를 추가합니다.", len(new_tokens_to_add))
+            # 중복 제거 후 신규 토큰 추가
+            tokenizer.add_tokens(list(set(new_tokens_to_add)))
             self.logger.info(
-                "Adding %d new tokens to the tokenizer.", len(new_tokens_to_add)
-            )
-            tokenizer.add_tokens(list(set(new_tokens_to_add)))  # Add unique new tokens
-            self.logger.info(
-                "New tokenizer vocab size after adding tokens: %d",
+                "토큰 추가 후 vocab 크기: %d",
                 tokenizer.get_vocab_size(),
             )
         else:
-            self.logger.info("No new tokens to add based on remap rules.")
+            self.logger.info("추가할 신규 토큰이 없습니다.")
 
-        # 5. Save the remapped tokenizer
+        # 5. 재할당 토크나이저 저장
         self.remapped_tokenizer_path.mkdir(parents=True, exist_ok=True)
         tokenizer.save(str(self.remapped_tokenizer_path / "tokenizer.json"))
 
         self.logger.info(
-            "Remapped tokenizer saved to %s",
+            "재할당 토크나이저 저장: %s",
             self.remapped_tokenizer_path / "tokenizer.json",
         )
-        self.logger.info("Remap Command finished.")
+        self.logger.info("✅ remap 단계가 완료되었습니다.")
         return {
             "status": "success",
             "remapped_tokenizer_path": str(self.remapped_tokenizer_path),

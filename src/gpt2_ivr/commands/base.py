@@ -16,9 +16,9 @@ class Command(ABC):
         Returns:
             실행 결과 딕셔너리 (다음 단계 입력용)
         """
-        pass
+        raise NotImplementedError
 
     @abstractmethod
     def get_name(self) -> str:
         """커맨드 이름 반환"""
-        pass
+        raise NotImplementedError

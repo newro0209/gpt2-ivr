@@ -4,7 +4,7 @@ from __future__ import annotations
 
 import os
 from pathlib import Path
-from typing import Iterator, TypedDict
+from typing import Iterator, TypedDict, cast
 
 from tokenizers import Tokenizer, models, pre_tokenizers, trainers
 from transformers import AutoTokenizer, PreTrainedTokenizerBase, PreTrainedTokenizerFast
@@ -67,7 +67,6 @@ def distill_unigram_tokenizer(
     original_tokenizer_dir: Path,
     distilled_tokenizer_dir: Path,
     corpus_dir: Path,
-    model_name: str,
 ) -> DistillResult:
     """GPT-2 BPE 토크나이저의 동작을 모방하는 Unigram 토크나이저를 distillation 방식으로 학습한다.
 
@@ -77,8 +76,6 @@ def distill_unigram_tokenizer(
         original_tokenizer_dir: 원본 토크나이저 디렉토리
         distilled_tokenizer_dir: 증류된 토크나이저 저장 디렉토리
         corpus_dir: 학습 코퍼스 디렉토리
-        model_name: Hugging Face Hub에서 로드할 모델 이름
-
     Returns:
         증류 결과 정보를 담은 딕셔너리
 
@@ -88,59 +85,36 @@ def distill_unigram_tokenizer(
     logger.info("🚀 Unigram 토크나이저 Distillation을 시작합니다.")
 
     # 1. GPT-2 BPE 토크나이저 로드
-    # 원본 디렉토리가 비어있거나 유효한 토크나이저 파일이 없으면 Hub에서 로드
+    # init 단계에서 내려받은 로컬 토크나이저만 사용한다.
     tokenizer_files = (
         list(original_tokenizer_dir.glob("*"))
         if original_tokenizer_dir.exists()
         else []
     )
 
-    if tokenizer_files and any(
+    has_tokenizer_files = any(
         f.name in ["tokenizer.json", "vocab.json", "merges.txt"]
         for f in tokenizer_files
-    ):
-        try:
-            original_tokenizer: PreTrainedTokenizerBase = AutoTokenizer.from_pretrained(
-                str(original_tokenizer_dir)
-            )
-            logger.info(
-                "✅ 원본 GPT-2 토크나이저 로드 완료. (vocab_size: %d)",
-                len(original_tokenizer.get_vocab()),
-            )
-        except Exception as e:
-            logger.warning(
-                "원본 토크나이저 로드 실패(%s): %s", original_tokenizer_dir, e
-            )
-            logger.info("Hugging Face Hub에서 '%s'를 다운로드합니다.", model_name)
-            original_tokenizer: PreTrainedTokenizerBase = AutoTokenizer.from_pretrained(
-                model_name
-            )
+    )
 
-            # Hub에서 로드한 토크나이저를 original 디렉토리에 저장
-            original_tokenizer_dir.mkdir(parents=True, exist_ok=True)
-            original_tokenizer.save_pretrained(str(original_tokenizer_dir))
-            logger.info(
-                "✅ Hub에서 '%s' 토크나이저 로드 및 저장 완료. (vocab_size: %d)",
-                model_name,
-                len(original_tokenizer.get_vocab()),
-            )
-    else:
-        logger.info(
-            "원본 토크나이저 디렉토리가 비어있습니다. Hugging Face Hub에서 '%s'를 다운로드합니다.",
-            model_name,
-        )
-        original_tokenizer: PreTrainedTokenizerBase = AutoTokenizer.from_pretrained(
-            model_name
+    if not has_tokenizer_files:
+        raise FileNotFoundError(
+            f"원본 토크나이저 파일이 없습니다: {original_tokenizer_dir}"
         )
 
-        # Hub에서 로드한 토크나이저를 original 디렉토리에 저장
-        original_tokenizer_dir.mkdir(parents=True, exist_ok=True)
-        original_tokenizer.save_pretrained(str(original_tokenizer_dir))
+    try:
+        original_tokenizer = cast(
+            PreTrainedTokenizerBase,
+            AutoTokenizer.from_pretrained(str(original_tokenizer_dir)),
+        )
         logger.info(
-            "✅ Hub에서 '%s' 토크나이저 로드 및 저장 완료. (vocab_size: %d)",
-            model_name,
+            "✅ 원본 GPT-2 토크나이저 로드 완료. (vocab_size: %d)",
             len(original_tokenizer.get_vocab()),
         )
+    except Exception as e:
+        raise RuntimeError(
+            f"원본 토크나이저 로드 실패: {original_tokenizer_dir}"
+        ) from e
 
     original_vocab_size = len(original_tokenizer.get_vocab())
     vocab_size = original_vocab_size
@@ -155,21 +129,13 @@ def distill_unigram_tokenizer(
     # 3. 트레이너 설정
     special_tokens = original_tokenizer.all_special_tokens
     # 원본 토크나이저의 unk_token 사용 (GPT-2는 <|endoftext|>가 unk 역할)
-    unk_token = (
-        original_tokenizer.unk_token or original_tokenizer.eos_token or "<|endoftext|>"
-    )
+    unk_token = original_tokenizer.unk_token or original_tokenizer.eos_token
+    assert isinstance(unk_token, str)
     if unk_token not in special_tokens:
         special_tokens.append(unk_token)
 
     trainer = trainers.UnigramTrainer(
-        vocab_size=vocab_size,
-        special_tokens=special_tokens,
-        unk_token=unk_token,
-        show_progress=True,
-        # EM 최적화 파라미터
-        max_piece_length=16,  # 최대 토큰 길이 제한 (짧을수록 빠름)
-        n_sub_iterations=2,  # EM 하위 반복 횟수 (기본값 2, 줄이면 빠르지만 품질 저하)
-        shrinking_factor=0.75,  # vocab 축소 계수 (크게 하면 빠름, 기본값 0.75)
+        vocab_size=vocab_size, special_tokens=special_tokens, unk_token=unk_token
     )
     logger.info(
         "⚙️ UnigramTrainer 설정 완료. (vocab_size: %d, special_tokens: %s)",

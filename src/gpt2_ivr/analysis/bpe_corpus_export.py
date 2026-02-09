@@ -7,10 +7,9 @@ from pathlib import Path
 from threading import Lock
 from typing import Iterable, Iterator, cast
 
-from tqdm import tqdm
 from transformers import BatchEncoding, GPT2Tokenizer
 
-from gpt2_ivr.utils.logging_config import get_logger
+from gpt2_ivr.utils.logging_config import create_progress, get_logger
 
 logger = get_logger(__name__)
 
@@ -109,15 +108,16 @@ def export_bpe_token_sequences(
     output_path.parent.mkdir(parents=True, exist_ok=True)
     with output_path.open("w", encoding="utf-8") as handle:
         with ThreadPoolExecutor(max_workers=workers) as executor:
-            for chunk_ids in tqdm(
-                executor.map(encode_chunk, chunk_iter(texts, chunk_size)),
-                desc="BPE 토큰 시퀀스 생성",
-                unit="청크",
-            ):
-                for token_ids in chunk_ids:
-                    handle.write(" ".join(str(token_id) for token_id in token_ids))
-                    handle.write("\n")
-                    total_lines += 1
-                    total_tokens += len(token_ids)
+            with create_progress() as progress:
+                task_id = progress.add_task("BPE 토큰 시퀀스 생성", total=None)
+                for chunk_ids in executor.map(
+                    encode_chunk, chunk_iter(texts, chunk_size)
+                ):
+                    progress.advance(task_id)
+                    for token_ids in chunk_ids:
+                        handle.write(" ".join(str(token_id) for token_id in token_ids))
+                        handle.write("\n")
+                        total_lines += 1
+                        total_tokens += len(token_ids)
 
     return total_lines, total_tokens

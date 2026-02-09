@@ -18,12 +18,10 @@ class DistillCommand(Command):
         original_tokenizer_dir: Path,
         distilled_tokenizer_dir: Path,
         corpus_dir: Path,
-        model_name: str,
     ):
         self.original_tokenizer_dir = original_tokenizer_dir
         self.distilled_tokenizer_dir = distilled_tokenizer_dir
         self.corpus_dir = corpus_dir
-        self.model_name = model_name
 
     def execute(self, **kwargs: Any) -> dict[str, Any]:
         """토크나이저 증류 실행"""
@@ -31,7 +29,6 @@ class DistillCommand(Command):
             original_tokenizer_dir=self.original_tokenizer_dir,
             distilled_tokenizer_dir=self.distilled_tokenizer_dir,
             corpus_dir=self.corpus_dir,
-            model_name=self.model_name,
         )
 
         return {

@@ -1,4 +1,4 @@
-"""Embedding Alignment Command"""
+"""임베딩 정렬 커맨드"""
 
 from __future__ import annotations
 
@@ -15,7 +15,7 @@ from gpt2_ivr.utils.logging_config import get_logger
 
 
 class AlignCommand(Command):
-    """Align Command - 임베딩 추출, 재정렬 및 초기화를 수행한다."""
+    """임베딩 추출, 재정렬 및 초기화를 수행한다."""
 
     def __init__(
         self,
@@ -36,7 +36,7 @@ class AlignCommand(Command):
 
     def execute(self, **kwargs: Any) -> dict[str, Any]:
         """커맨드 실행 로직"""
-        self.logger.info("🚀 Align Command 시작")
+        self.logger.info("🚀 align 단계를 시작합니다.")
 
         # 1. 원본 모델에서 임베딩 추출
         self.logger.info("=" * 60)
@@ -79,7 +79,7 @@ class AlignCommand(Command):
         )
 
         self.logger.info("=" * 60)
-        self.logger.info("✅ Align Command 완료")
+        self.logger.info("✅ align 단계가 완료되었습니다.")
         self.logger.info("=" * 60)
 
         return {

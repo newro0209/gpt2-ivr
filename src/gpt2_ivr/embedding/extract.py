@@ -32,7 +32,7 @@ def extract_embeddings(
         logger = get_logger("gpt2_ivr.embedding.extract")
 
     logger.info("🔍 모델 로딩 중: %s", model_name)
-    model = GPT2LMHeadModel.from_pretrained(model_name)
+    model = GPT2LMHeadModel.from_pretrained(model_name, local_files_only=True)
 
     # 임베딩 추출
     wte = model.transformer.wte.weight.data.clone()  # Token embeddings

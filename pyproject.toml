@@ -19,8 +19,9 @@ dependencies = [
     "tokenizers>=0.22.2",
     "torch>=2.10.0",
     "torchvision>=0.25.0",
-    "tqdm>=4.67.3",
     "transformers>=5.1.0",
+    "datasets>=4.5.0",
+    "rich>=14.3.2",
 ]
 
 [project.scripts]
