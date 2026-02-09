@@ -320,6 +320,8 @@ artifacts/corpora/raw/     # 원본 데이터 수집
 artifacts/corpora/cleaned/ # 정제 완료 데이터
 ```
 
+> `uv run ivr init`을 실행하면 `artifacts/corpora/raw/` 아래의 `.txt`, `.jsonl`, `.json` 파일을 자동으로 정제하여 `artifacts/corpora/cleaned/`에 일관된 `.txt` 형식으로 저장합니다. 기본적으로 JSON/JSONL에서 `text` 키를 사용하며 인코딩은 `utf-8`입니다. 필요하면 `--text-key`, `--encoding`, `--normalize-force`, `--raw-corpora-dir`, `--cleaned-corpora-dir`로 동작을 조정할 수 있습니다.
+
 ---
 
 ### 3️⃣ 모델 및 토크나이저 초기화
@@ -331,6 +333,8 @@ uv run ivr init
 - Hugging Face Hub에서 GPT-2 토크나이저와 모델 설정을 다운로드
 - 산출물: `artifacts/tokenizers/original/`
 - `--force` 옵션으로 기존 파일이 있어도 다시 다운로드 가능
+- `--raw-corpora-dir`/`--cleaned-corpora-dir`를 지정하여 다른 디렉토리를 정제 대상으로 사용할 수 있습니다.
+- `--text-key`/`--encoding`으로 JSON 계열 파일에서 읽을 텍스트 키와 인코딩을 조정하거나 `--normalize-force`를 사용하여 존재하는 정제본을 덮어쓸 수 있습니다.
 
 ---
 

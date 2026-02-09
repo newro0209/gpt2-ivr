@@ -34,6 +34,7 @@ from gpt2_ivr.commands import (
 from gpt2_ivr.constants import (
     BPE_TOKEN_ID_SEQUENCES_FILE,
     CORPORA_CLEANED_DIR,
+    CORPORA_RAW_DIR,
     EMBEDDINGS_ROOT,
     LOGS_DIR,
     REPLACEMENT_CANDIDATES_FILE,
@@ -162,6 +163,25 @@ def setup_subparsers(subparsers: argparse._SubParsersAction) -> None:
         "--tokenizer-dir", type=Path, default=TOKENIZER_ORIGINAL_DIR, help="토크나이저 저장 디렉토리"
     )
     init_parser.add_argument("--force", action="store_true", help="기존 파일이 있어도 다시 다운로드")
+    init_parser.add_argument(
+        "--raw-corpora-dir",
+        type=Path,
+        default=CORPORA_RAW_DIR,
+        help="raw 코퍼스가 위치한 디렉토리",
+    )
+    init_parser.add_argument(
+        "--cleaned-corpora-dir",
+        type=Path,
+        default=CORPORA_CLEANED_DIR,
+        help="정제된 코퍼스를 저장할 디렉토리",
+    )
+    init_parser.add_argument("--text-key", default="text", help="JSON/JSONL 파일에서 텍스트를 읽어올 키")
+    init_parser.add_argument("--encoding", default="utf-8", help="입력 코퍼스 파일 인코딩")
+    init_parser.add_argument(
+        "--normalize-force",
+        action="store_true",
+        help="이미 정제본이 있어도 raw 파일을 다시 변환합니다",
+    )
 
     # analyze
     analyze_parser = subparsers.add_parser("analyze", help="BPE 토큰 시퀀스 분석", formatter_class=CliHelpFormatter)
@@ -314,7 +334,16 @@ def create_command(args: argparse.Namespace) -> Command:
         NotImplementedError: 유효하지 않은 커맨드인 경우
     """
     command_map: dict[str, Callable[[argparse.Namespace], Command]] = {
-        "init": lambda a: InitCommand(a.model_name, a.tokenizer_dir, a.force),
+        "init": lambda a: InitCommand(
+            a.model_name,
+            a.tokenizer_dir,
+            a.force,
+            a.raw_corpora_dir,
+            a.cleaned_corpora_dir,
+            a.text_key,
+            a.encoding,
+            a.normalize_force,
+        ),
         "analyze": lambda a: AnalyzeCommand(
             a.input_dir,
             a.output_sequences,
@@ -460,7 +489,6 @@ def main() -> int:
     try:
         command = create_command(args)
         command_name = command.get_name()
-
         logger.info("🚀 [%s] 단계를 시작합니다.", command_name)
         result = command.execute()
         elapsed = perf_counter() - start

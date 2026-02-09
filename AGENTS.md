@@ -25,6 +25,7 @@
   - `uv run ivr train`
 - `distill-tokenizer` 단계는 `remap` 이전에 반드시 수행한다.
 - 엔트리 포인트 실행은 개별 스크립트 직접 호출 대신 `uv run ivr <command>` 형식을 기본으로 사용한다.
+- `uv run ivr init`은 `artifacts/corpora/raw/` 아래의 `.txt`, `.jsonl`, `.json`을 일관된 `.txt`로 정제하여 `artifacts/corpora/cleaned/`에 저장합니다. `--text-key`, `--encoding`, `--raw-corpora-dir`, `--cleaned-corpora-dir`, `--normalize-force`로 정제 동작을 미세 조정할 수 있습니다.
 
 ## 코딩 스타일 및 네이밍 규칙
 
