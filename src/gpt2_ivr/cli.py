@@ -182,63 +182,74 @@ def print_intro(logger: logging.Logger) -> None:
     logger.info("BPE -> Unigram 토크나이저 교체 후 IVR를 수행합니다.")
 
 
+def _create_analyze_command(args: argparse.Namespace) -> AnalyzeCommand:
+    """analyze 커맨드를 생성한다."""
+    return AnalyzeCommand(
+        input_dir=Path(args.input_dir),
+        output_sequences=Path(args.output_sequences),
+        output_frequency=Path(args.output_frequency),
+        model_name=args.model_name,
+        workers=args.workers,
+        chunk_size=args.chunk_size,
+        max_texts=args.max_texts,
+    )
+
+
+def _create_distill_command(args: argparse.Namespace) -> DistillCommand:
+    """distill-tokenizer 커맨드를 생성한다."""
+    return DistillCommand(
+        original_tokenizer_dir=Path(args.original_tokenizer_dir),
+        distilled_tokenizer_dir=Path(args.distilled_tokenizer_dir),
+        corpus_dir=Path(args.corpus_dir),
+        vocab_size=args.vocab_size,
+        model_name=args.model_name,
+    )
+
+
+def _create_select_command(args: argparse.Namespace) -> SelectCommand:
+    """select 커맨드를 생성한다."""
+    return SelectCommand(
+        frequency_path=Path(args.frequency_path),
+        sequences_path=Path(args.sequences_path),
+        output_csv=Path(args.output_csv),
+        output_log=Path(args.output_log),
+        model_name=args.model_name,
+        max_candidates=args.max_candidates,
+        min_token_len=args.min_token_len,
+    )
+
+
+def _create_remap_command(args: argparse.Namespace) -> RemapCommand:
+    """remap 커맨드를 생성한다."""
+    return RemapCommand(
+        distilled_tokenizer_dir=Path(args.distilled_tokenizer_dir),
+        remapped_tokenizer_dir=Path(args.remapped_tokenizer_dir),
+        remap_rules_path=Path(args.remap_rules_path),
+        replacement_candidates_path=Path(args.replacement_candidates_path),
+    )
+
+
+def _create_align_command(args: argparse.Namespace) -> AlignCommand:
+    """align 커맨드를 생성한다. (현재 stub)"""
+    # TODO: align 커맨드에 CLI 옵션이 추가되면 args를 사용하여 파라미터 전달
+    return AlignCommand()
+
+
+def _create_train_command(args: argparse.Namespace) -> TrainCommand:
+    """train 커맨드를 생성한다. (현재 stub)"""
+    # TODO: train 커맨드에 CLI 옵션이 추가되면 args를 사용하여 파라미터 전달
+    return TrainCommand()
+
+
 def create_command(command_name: str, args: argparse.Namespace) -> Command:
     """커맨드 이름에 해당하는 Command 객체를 생성한다."""
-
-    def create_analyze_command(args: argparse.Namespace) -> AnalyzeCommand:
-        return AnalyzeCommand(
-            input_dir=Path(args.input_dir),
-            output_sequences=Path(args.output_sequences),
-            output_frequency=Path(args.output_frequency),
-            model_name=args.model_name,
-            workers=args.workers,
-            chunk_size=args.chunk_size,
-            max_texts=args.max_texts,
-        )
-
-    def create_distill_command(args: argparse.Namespace) -> DistillCommand:
-        return DistillCommand(
-            original_tokenizer_dir=Path(args.original_tokenizer_dir),
-            distilled_tokenizer_dir=Path(args.distilled_tokenizer_dir),
-            corpus_dir=Path(args.corpus_dir),
-            vocab_size=args.vocab_size,
-            model_name=args.model_name,
-        )
-
-    def create_select_command(args: argparse.Namespace) -> SelectCommand:
-        return SelectCommand(
-            frequency_path=Path(args.frequency_path),
-            sequences_path=Path(args.sequences_path),
-            output_csv=Path(args.output_csv),
-            output_log=Path(args.output_log),
-            model_name=args.model_name,
-            max_candidates=args.max_candidates,
-            min_token_len=args.min_token_len,
-        )
-
-    def create_remap_command(args: argparse.Namespace) -> RemapCommand:
-        return RemapCommand(
-            distilled_tokenizer_dir=Path(args.distilled_tokenizer_dir),
-            remapped_tokenizer_dir=Path(args.remapped_tokenizer_dir),
-            remap_rules_path=Path(args.remap_rules_path),
-            replacement_candidates_path=Path(args.replacement_candidates_path),
-        )
-
-    def create_align_command(args: argparse.Namespace) -> AlignCommand:
-        # TODO: align 커맨드에 CLI 옵션이 추가되면 args를 사용하여 파라미터 전달
-        return AlignCommand()
-
-    def create_train_command(args: argparse.Namespace) -> TrainCommand:
-        # TODO: train 커맨드에 CLI 옵션이 추가되면 args를 사용하여 파라미터 전달
-        return TrainCommand()
-
     command_factories = {
-        "analyze": create_analyze_command,
-        "distill-tokenizer": create_distill_command,
-        "select": create_select_command,
-        "remap": create_remap_command,
-        "align": create_align_command,
-        "train": create_train_command,
+        "analyze": _create_analyze_command,
+        "distill-tokenizer": _create_distill_command,
+        "select": _create_select_command,
+        "remap": _create_remap_command,
+        "align": _create_align_command,
+        "train": _create_train_command,
     }
 
     if command_name in command_factories:

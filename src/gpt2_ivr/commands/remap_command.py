@@ -16,11 +16,6 @@ from gpt2_ivr.utils.logging_config import get_logger
 class RemapCommand(Command):
     """Remap Command"""
 
-    @staticmethod
-    def _ensure_path(path: Path | str) -> Path:
-        """문자열 또는 Path를 Path 객체로 변환한다."""
-        return Path(path) if isinstance(path, str) else path
-
     def __init__(
         self,
         distilled_tokenizer_dir: Path | str = "artifacts/tokenizers/distilled_unigram",
@@ -42,10 +37,10 @@ class RemapCommand(Command):
             CWD가 변경되면 경로가 달라질 수 있으므로 주의하세요.
         """
         self.logger = get_logger("gpt2_ivr.remap")
-        self.distilled_tokenizer_path = self._ensure_path(distilled_tokenizer_dir)
-        self.remapped_tokenizer_path = self._ensure_path(remapped_tokenizer_dir)
-        self.remap_rules_path = self._ensure_path(remap_rules_path)
-        self.replacement_candidates_path = self._ensure_path(replacement_candidates_path)
+        self.distilled_tokenizer_path = Path(distilled_tokenizer_dir)
+        self.remapped_tokenizer_path = Path(remapped_tokenizer_dir)
+        self.remap_rules_path = Path(remap_rules_path)
+        self.replacement_candidates_path = Path(replacement_candidates_path)
 
     def execute(self, **kwargs: Any) -> dict[str, Any]:
         """커맨드 실행 로직"""
