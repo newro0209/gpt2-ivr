@@ -70,27 +70,25 @@ def initialize_new_token_embeddings(
     remapped_vocab = remapped_tokenizer.get_vocab()
 
     for token, token_id in remapped_vocab.items():
-        # remap rules에 있는 new_token 중 original에 없던 것
-        is_new = True
-        for old_token, new_token in remap_rules.items():
-            if token == new_token:
-                old_id = original_tokenizer.token_to_id(old_token)
-                if old_id is None:
-                    # old_token도 없었던 경우 -> 진짜 신규
-                    is_new = True
-                else:
-                    # old_token이 있었던 경우 -> 재할당이므로 신규 아님
-                    is_new = False
-                break
-        else:
-            # remap_rules에 없는 토큰인 경우, original에 있는지 확인
-            if original_tokenizer.token_to_id(token) is not None:
-                is_new = False
+        # 먼저 original 토크나이저에 있는지 확인
+        if original_tokenizer.token_to_id(token) is not None:
+            continue  # 원래 있던 토큰이면 스킵
 
-        if is_new and token_id < vocab_size:
-            # 임베딩이 초기화되지 않았는지 확인 (모두 0인 경우)
-            if torch.all(aligned_wte[token_id] == 0):
-                new_tokens.append((token, token_id))
+        # remap rules에서 이 토큰이 target으로 사용되는지 확인
+        is_remapped_target = token in remap_rules.values()
+        if is_remapped_target:
+            # 이 토큰이 remap의 결과라면, source 토큰이 original에 있었는지 확인
+            source_existed = any(
+                original_tokenizer.token_to_id(old_token) is not None
+                for old_token, new_token in remap_rules.items()
+                if new_token == token
+            )
+            if source_existed:
+                continue  # source가 있었다면 재할당이므로 신규 아님
+
+        # token_id가 범위 내이고 임베딩이 초기화되지 않았는지 확인
+        if token_id < vocab_size and torch.all(aligned_wte[token_id] == 0):
+            new_tokens.append((token, token_id))
 
     logger.info("신규 토큰 %d개 발견", len(new_tokens))
 
@@ -113,7 +111,12 @@ def initialize_new_token_embeddings(
 
         elif init_strategy == "random":
             # 정규분포로부터 랜덤 초기화
-            std = aligned_wte[~torch.all(aligned_wte == 0, dim=1)].std().item()
+            non_zero_mask = ~torch.all(aligned_wte == 0, dim=1)
+            if non_zero_mask.sum() > 0:
+                std = aligned_wte[non_zero_mask].std().item()
+            else:
+                std = 0.02  # 기본 표준편차 (GPT-2 초기화 값)
+
             for token, token_id in new_tokens:
                 aligned_wte[token_id] = torch.randn(embedding_dim) * std
                 logger.debug(
