@@ -16,6 +16,16 @@ from gpt2_ivr.commands import (
     AlignCommand,
     TrainCommand,
 )
+from gpt2_ivr.constants import (
+    BPE_TOKEN_ID_SEQUENCES_FILE,
+    CORPORA_CLEANED_DIR,
+    REPLACEMENT_CANDIDATES_FILE,
+    SELECTION_LOG_FILE,
+    TOKENIZER_DISTILLED_UNIGRAM_DIR,
+    TOKENIZER_ORIGINAL_DIR,
+    TOKENIZER_REMAPPED_DIR,
+    TOKEN_FREQUENCY_FILE,
+)
 from gpt2_ivr.utils.logging_config import get_logger, setup_logging
 
 
@@ -44,7 +54,7 @@ def build_parser() -> argparse.ArgumentParser:
     )
     init_parser.add_argument(
         "--tokenizer-dir",
-        default="artifacts/tokenizers/original",
+        default=str(TOKENIZER_ORIGINAL_DIR),
         help="토크나이저 저장 디렉토리",
     )
     init_parser.add_argument(
@@ -58,17 +68,17 @@ def build_parser() -> argparse.ArgumentParser:
     analyze_parser = subparsers.add_parser("analyze", help="BPE 토큰 시퀀스 분석")
     analyze_parser.add_argument(
         "--input-dir",
-        default="artifacts/corpora/cleaned",
+        default=str(CORPORA_CLEANED_DIR),
         help="코퍼스 입력 디렉토리",
     )
     analyze_parser.add_argument(
         "--output-sequences",
-        default="artifacts/analysis/reports/bpe_token_id_sequences.txt",
+        default=str(BPE_TOKEN_ID_SEQUENCES_FILE),
         help="BPE 토큰 시퀀스 출력 경로",
     )
     analyze_parser.add_argument(
         "--output-frequency",
-        default="artifacts/analysis/reports/token_frequency.parquet",
+        default=str(TOKEN_FREQUENCY_FILE),
         help="토큰 빈도 parquet 출력 경로",
     )
     analyze_parser.add_argument(
@@ -101,17 +111,17 @@ def build_parser() -> argparse.ArgumentParser:
     )
     distill_parser.add_argument(
         "--original-tokenizer-dir",
-        default="artifacts/tokenizers/original",
+        default=str(TOKENIZER_ORIGINAL_DIR),
         help="원본 토크나이저 디렉토리",
     )
     distill_parser.add_argument(
         "--distilled-tokenizer-dir",
-        default="artifacts/tokenizers/distilled_unigram",
+        default=str(TOKENIZER_DISTILLED_UNIGRAM_DIR),
         help="증류된 토크나이저 저장 디렉토리",
     )
     distill_parser.add_argument(
         "--corpus-dir",
-        default="artifacts/corpora/cleaned",
+        default=str(CORPORA_CLEANED_DIR),
         help="학습 코퍼스 디렉토리",
     )
     distill_parser.add_argument(
@@ -130,22 +140,22 @@ def build_parser() -> argparse.ArgumentParser:
     select_parser = subparsers.add_parser("select", help="IVR 대상 토큰 선정")
     select_parser.add_argument(
         "--frequency-path",
-        default="artifacts/analysis/reports/token_frequency.parquet",
+        default=str(TOKEN_FREQUENCY_FILE),
         help="토큰 빈도 parquet 파일 경로",
     )
     select_parser.add_argument(
         "--sequences-path",
-        default="artifacts/analysis/reports/bpe_token_id_sequences.txt",
+        default=str(BPE_TOKEN_ID_SEQUENCES_FILE),
         help="BPE 토큰 시퀀스 파일 경로",
     )
     select_parser.add_argument(
         "--output-csv",
-        default="artifacts/analysis/reports/replacement_candidates.csv",
+        default=str(REPLACEMENT_CANDIDATES_FILE),
         help="교체 후보 CSV 저장 경로",
     )
     select_parser.add_argument(
         "--output-log",
-        default="artifacts/analysis/reports/selection_log.md",
+        default=str(SELECTION_LOG_FILE),
         help="선정 로그 저장 경로",
     )
     select_parser.add_argument(
@@ -170,12 +180,12 @@ def build_parser() -> argparse.ArgumentParser:
     remap_parser = subparsers.add_parser("remap", help="토큰 재할당 규칙 적용")
     remap_parser.add_argument(
         "--distilled-tokenizer-dir",
-        default="artifacts/tokenizers/distilled_unigram",
+        default=str(TOKENIZER_DISTILLED_UNIGRAM_DIR),
         help="증류된 토크나이저 디렉토리",
     )
     remap_parser.add_argument(
         "--remapped-tokenizer-dir",
-        default="artifacts/tokenizers/remapped",
+        default=str(TOKENIZER_REMAPPED_DIR),
         help="재할당 토크나이저 디렉토리",
     )
     remap_parser.add_argument(
@@ -185,7 +195,7 @@ def build_parser() -> argparse.ArgumentParser:
     )
     remap_parser.add_argument(
         "--replacement-candidates-path",
-        default="artifacts/analysis/reports/replacement_candidates.csv",
+        default=str(REPLACEMENT_CANDIDATES_FILE),
         help="교체 후보 CSV 경로",
     )
 

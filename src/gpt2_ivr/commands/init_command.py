@@ -5,6 +5,7 @@ from __future__ import annotations
 from pathlib import Path
 from typing import Any
 
+from gpt2_ivr.constants import TOKENIZER_ORIGINAL_DIR
 from gpt2_ivr.tokenizer import initialize_assets
 
 from .base import Command
@@ -16,7 +17,7 @@ class InitCommand(Command):
     def __init__(
         self,
         model_name: str = "openai-community/gpt2",
-        tokenizer_dir: Path = Path("artifacts/tokenizers/original"),
+        tokenizer_dir: Path = TOKENIZER_ORIGINAL_DIR,
         force: bool = False,
     ):
         self.model_name = model_name

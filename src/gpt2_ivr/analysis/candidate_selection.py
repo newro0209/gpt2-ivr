@@ -4,8 +4,8 @@ token_frequency.parquet 와 bpe_token_id_sequences.txt 를 기반으로
 저빈도 희생 토큰과 고빈도 도메인 바이그램 병합 후보를 매칭한다.
 
 산출물:
-    - artifacts/analysis/reports/replacement_candidates.csv
-    - artifacts/analysis/reports/selection_log.md
+    - REPLACEMENT_CANDIDATES_FILE (constants 모듈 참조)
+    - SELECTION_LOG_FILE (constants 모듈 참조)
 """
 
 from __future__ import annotations
