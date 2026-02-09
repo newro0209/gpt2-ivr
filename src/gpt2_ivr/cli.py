@@ -189,11 +189,61 @@ def build_parser() -> argparse.ArgumentParser:
         help="교체 후보 CSV 경로",
     )
 
-    # align 서브커맨드 (현재 stub)
-    subparsers.add_parser("align", help="embedding 재정렬")
+    # align 서브커맨드
+    align_parser = subparsers.add_parser("align", help="embedding 재정렬")
+    align_parser.add_argument(
+        "--model-name",
+        default="openai-community/gpt2",
+        help="모델 이름",
+    )
+    align_parser.add_argument(
+        "--original-tokenizer-dir",
+        default="artifacts/tokenizers/original",
+        help="원본 토크나이저 디렉토리",
+    )
+    align_parser.add_argument(
+        "--remapped-tokenizer-dir",
+        default="artifacts/tokenizers/remapped",
+        help="재할당 토크나이저 디렉토리",
+    )
+    align_parser.add_argument(
+        "--remap-rules-path",
+        default="src/gpt2_ivr/tokenizer/remap_rules.yaml",
+        help="재할당 규칙 파일 경로",
+    )
+    align_parser.add_argument(
+        "--embeddings-dir",
+        default="artifacts/embeddings",
+        help="임베딩 저장 디렉토리",
+    )
 
-    # train 서브커맨드 (현재 stub)
-    subparsers.add_parser("train", help="미세조정")
+    # train 서브커맨드
+    train_parser = subparsers.add_parser("train", help="미세조정")
+    train_parser.add_argument(
+        "--model-name",
+        default="openai-community/gpt2",
+        help="모델 이름",
+    )
+    train_parser.add_argument(
+        "--tokenizer-path",
+        default="artifacts/tokenizers/remapped",
+        help="토크나이저 경로",
+    )
+    train_parser.add_argument(
+        "--dataset-path",
+        default="artifacts/corpora/cleaned",
+        help="학습 데이터셋 경로",
+    )
+    train_parser.add_argument(
+        "--output-dir",
+        default="artifacts/training/sft_checkpoint",
+        help="체크포인트 저장 디렉토리",
+    )
+    train_parser.add_argument(
+        "--config-path",
+        default="src/gpt2_ivr/training/sft_config.yaml",
+        help="학습 설정 파일 경로",
+    )
 
     return parser
 
@@ -261,15 +311,25 @@ def _create_remap_command(args: argparse.Namespace) -> RemapCommand:
 
 
 def _create_align_command(args: argparse.Namespace) -> AlignCommand:
-    """align 커맨드를 생성한다. (현재 stub)"""
-    # TODO: align 커맨드에 CLI 옵션이 추가되면 args를 사용하여 파라미터 전달
-    return AlignCommand()
+    """align 커맨드를 생성한다."""
+    return AlignCommand(
+        model_name_or_path=args.model_name,
+        original_tokenizer_path=Path(args.original_tokenizer_dir),
+        remapped_tokenizer_path=Path(args.remapped_tokenizer_dir),
+        remap_rules_path=Path(args.remap_rules_path),
+        embeddings_dir=Path(args.embeddings_dir),
+    )
 
 
 def _create_train_command(args: argparse.Namespace) -> TrainCommand:
-    """train 커맨드를 생성한다. (현재 stub)"""
-    # TODO: train 커맨드에 CLI 옵션이 추가되면 args를 사용하여 파라미터 전달
-    return TrainCommand()
+    """train 커맨드를 생성한다."""
+    return TrainCommand(
+        model_name_or_path=args.model_name,
+        tokenizer_path=Path(args.tokenizer_path),
+        dataset_path=Path(args.dataset_path),
+        output_dir=Path(args.output_dir),
+        config_path=Path(args.config_path),
+    )
 
 
 # 서브커맨드 팩토리 매핑
