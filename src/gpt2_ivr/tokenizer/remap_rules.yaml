@@ -14,5 +14,6 @@
 
 # 아래는 예시 규칙이며, 실제 프로젝트에서는 `replacement_candidates.csv`를
 # 기반으로 신중하게 작성해야 합니다.
-" unused_token_1": " 새로운_토큰_1"
-" unused_token_2": " 새로운_토큰_2"
+" uncommon_token_A": " 새_토큰_가"
+" uncommon_token_B": " 새_토큰_나"
+" uncommon_token_D": " 새_토큰_라" # 존재하지 않는 토큰에 대한 규칙

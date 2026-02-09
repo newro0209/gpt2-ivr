@@ -144,10 +144,12 @@ version = "0.1.0"
 source = { editable = "." }
 dependencies = [
     { name = "accelerate" },
+    { name = "pandas" },
     { name = "protobuf" },
     { name = "pyarrow" },
     { name = "pyfiglet" },
     { name = "pyright" },
+    { name = "pyyaml" },
     { name = "tokenizers" },
     { name = "torch", version = "2.10.0", source = { registry = "http://172.20.48.1:3141/root/pypi/+simple/" }, marker = "sys_platform != 'linux' and sys_platform != 'win32'" },
     { name = "torch", version = "2.10.0+cu130", source = { registry = "https://download.pytorch.org/whl/cu130" }, marker = "sys_platform == 'linux' or sys_platform == 'win32'" },
@@ -165,10 +167,12 @@ dev = [
 [package.metadata]
 requires-dist = [
     { name = "accelerate", specifier = ">=1.12.0" },
+    { name = "pandas", specifier = "~=2.2.0" },
     { name = "protobuf", specifier = ">=6.33.5" },
     { name = "pyarrow", specifier = ">=23.0.0" },
     { name = "pyfiglet", specifier = ">=1.0.4" },
     { name = "pyright", specifier = ">=1.1.408" },
+    { name = "pyyaml", specifier = "~=6.0" },
     { name = "tokenizers", specifier = ">=0.22.2" },
     { name = "torch", marker = "sys_platform != 'linux' and sys_platform != 'win32'", specifier = ">=2.10.0" },
     { name = "torch", marker = "sys_platform == 'linux' or sys_platform == 'win32'", specifier = ">=2.10.0", index = "https://download.pytorch.org/whl/cu130" },
@@ -586,6 +590,33 @@ wheels = [
 ]
 
 [[package]]
+name = "pandas"
+version = "2.2.3"
+source = { registry = "http://172.20.48.1:3141/root/pypi/+simple/" }
+dependencies = [
+    { name = "numpy" },
+    { name = "python-dateutil" },
+    { name = "pytz" },
+    { name = "tzdata" },
+]
+sdist = { url = "http://172.20.48.1:3141/root/pypi/+f/4f1/8ba62b61d7e19/pandas-2.2.3.tar.gz", hash = "sha256:4f18ba62b61d7e192368b84517265a99b4d7ee8912f8708660fb4a366cc82667" }
+wheels = [
+    { url = "http://172.20.48.1:3141/root/pypi/+f/f00/d1345d84d8c86/pandas-2.2.3-cp313-cp313-macosx_10_13_x86_64.whl", hash = "sha256:f00d1345d84d8c86a63e476bb4955e46458b304b9575dcf71102b5c705320015" },
+    { url = "http://172.20.48.1:3141/root/pypi/+f/350/8d914817e153a/pandas-2.2.3-cp313-cp313-macosx_11_0_arm64.whl", hash = "sha256:3508d914817e153ad359d7e069d752cdd736a247c322d932eb89e6bc84217f28" },
+    { url = "http://172.20.48.1:3141/root/pypi/+f/22a/9d949bfc9a502/pandas-2.2.3-cp313-cp313-manylinux2014_aarch64.manylinux_2_17_aarch64.whl", hash = "sha256:22a9d949bfc9a502d320aa04e5d02feab689d61da4e7764b62c30b991c42c5f0" },
+    { url = "http://172.20.48.1:3141/root/pypi/+f/f3a/255b2c19987fb/pandas-2.2.3-cp313-cp313-manylinux_2_17_x86_64.manylinux2014_x86_64.whl", hash = "sha256:f3a255b2c19987fbbe62a9dfd6cff7ff2aa9ccab3fc75218fd4b7530f01efa24" },
+    { url = "http://172.20.48.1:3141/root/pypi/+f/800/250ecdadb6d9c/pandas-2.2.3-cp313-cp313-musllinux_1_2_aarch64.whl", hash = "sha256:800250ecdadb6d9c78eae4990da62743b857b470883fa27f652db8bdde7f6659" },
+    { url = "http://172.20.48.1:3141/root/pypi/+f/637/4c452ff3ec675/pandas-2.2.3-cp313-cp313-musllinux_1_2_x86_64.whl", hash = "sha256:6374c452ff3ec675a8f46fd9ab25c4ad0ba590b71cf0656f8b6daa5202bca3fb" },
+    { url = "http://172.20.48.1:3141/root/pypi/+f/61c/5ad4043f791b6/pandas-2.2.3-cp313-cp313-win_amd64.whl", hash = "sha256:61c5ad4043f791b61dd4752191d9f07f0ae412515d59ba8f005832a532f8736d" },
+    { url = "http://172.20.48.1:3141/root/pypi/+f/3b7/1f27954685ee6/pandas-2.2.3-cp313-cp313t-macosx_10_13_x86_64.whl", hash = "sha256:3b71f27954685ee685317063bf13c7709a7ba74fc996b84fc6821c59b0f06468" },
+    { url = "http://172.20.48.1:3141/root/pypi/+f/38c/f8125c40dae9d/pandas-2.2.3-cp313-cp313t-macosx_11_0_arm64.whl", hash = "sha256:38cf8125c40dae9d5acc10fa66af8ea6fdf760b2714ee482ca691fc66e6fcb18" },
+    { url = "http://172.20.48.1:3141/root/pypi/+f/ba9/6630bc17c8751/pandas-2.2.3-cp313-cp313t-manylinux2014_aarch64.manylinux_2_17_aarch64.whl", hash = "sha256:ba96630bc17c875161df3818780af30e43be9b166ce51c9a18c1feae342906c2" },
+    { url = "http://172.20.48.1:3141/root/pypi/+f/1db/71525a1538b30/pandas-2.2.3-cp313-cp313t-manylinux_2_17_x86_64.manylinux2014_x86_64.whl", hash = "sha256:1db71525a1538b30142094edb9adc10be3f3e176748cd7acc2240c2f2e5aa3a4" },
+    { url = "http://172.20.48.1:3141/root/pypi/+f/15c/0e1e02e931161/pandas-2.2.3-cp313-cp313t-musllinux_1_2_aarch64.whl", hash = "sha256:15c0e1e02e93116177d29ff83e8b1619c93ddc9c49083f237d4312337a61165d" },
+    { url = "http://172.20.48.1:3141/root/pypi/+f/ad5/b65698ab28ed8/pandas-2.2.3-cp313-cp313t-musllinux_1_2_x86_64.whl", hash = "sha256:ad5b65698ab28ed8d7f18790a0dc58005c7629f227be9ecc1072aa74c0c1d43a" },
+]
+
+[[package]]
 name = "pathspec"
 version = "1.0.4"
 source = { registry = "http://172.20.48.1:3141/root/pypi/+simple/" }
@@ -763,6 +794,18 @@ wheels = [
 ]
 
 [[package]]
+name = "python-dateutil"
+version = "2.9.0.post0"
+source = { registry = "http://172.20.48.1:3141/root/pypi/+simple/" }
+dependencies = [
+    { name = "six" },
+]
+sdist = { url = "http://172.20.48.1:3141/root/pypi/+f/37d/d54208da7e1cd/python-dateutil-2.9.0.post0.tar.gz", hash = "sha256:37dd54208da7e1cd875388217d5e00ebd4179249f90fb72437e91a35459a0ad3" }
+wheels = [
+    { url = "http://172.20.48.1:3141/root/pypi/+f/a8b/2bc7bffae2822/python_dateutil-2.9.0.post0-py2.py3-none-any.whl", hash = "sha256:a8b2bc7bffae282281c8140a97d3aa9c14da0b136dfe83f850eea9a5f7470427" },
+]
+
+[[package]]
 name = "pytokens"
 version = "0.4.1"
 source = { registry = "http://172.20.48.1:3141/root/pypi/+simple/" }
@@ -784,6 +827,15 @@ wheels = [
     { url = "http://172.20.48.1:3141/root/pypi/+f/967/cf6e3fd4adf7d/pytokens-0.4.1-cp314-cp314t-musllinux_1_2_x86_64.whl", hash = "sha256:967cf6e3fd4adf7de8fc73cd3043754ae79c36475c1c11d514fc72cf5490094a" },
     { url = "http://172.20.48.1:3141/root/pypi/+f/584/c80c24b078eec/pytokens-0.4.1-cp314-cp314t-win_amd64.whl", hash = "sha256:584c80c24b078eec1e227079d56dc22ff755e0ba8654d8383b2c549107528918" },
     { url = "http://172.20.48.1:3141/root/pypi/+f/26c/ef14744a8385f/pytokens-0.4.1-py3-none-any.whl", hash = "sha256:26cef14744a8385f35d0e095dc8b3a7583f6c953c2e3d269c7f82484bf5ad2de" },
+]
+
+[[package]]
+name = "pytz"
+version = "2025.2"
+source = { registry = "http://172.20.48.1:3141/root/pypi/+simple/" }
+sdist = { url = "http://172.20.48.1:3141/root/pypi/+f/360/b9e3dbb49a209/pytz-2025.2.tar.gz", hash = "sha256:360b9e3dbb49a209c21ad61809c7fb453643e048b38924c765813546746e81c3" }
+wheels = [
+    { url = "http://172.20.48.1:3141/root/pypi/+f/5dd/f76296dd8c44c/pytz-2025.2-py2.py3-none-any.whl", hash = "sha256:5ddf76296dd8c44c26eb8f4b6f35488f3ccbf6fbbd7adee0b7262d43f0ec2f00" },
 ]
 
 [[package]]
@@ -932,6 +984,15 @@ source = { registry = "http://172.20.48.1:3141/root/pypi/+simple/" }
 sdist = { url = "http://172.20.48.1:3141/root/pypi/+f/8db/ca0739d487e5b/shellingham-1.5.4.tar.gz", hash = "sha256:8dbca0739d487e5bd35ab3ca4b36e11c4078f3a234bfce294b0a0291363404de" }
 wheels = [
     { url = "http://172.20.48.1:3141/root/pypi/+f/7ec/fff8f2fd72616/shellingham-1.5.4-py2.py3-none-any.whl", hash = "sha256:7ecfff8f2fd72616f7481040475a65b2bf8af90a56c89140852d1120324e8686" },
+]
+
+[[package]]
+name = "six"
+version = "1.17.0"
+source = { registry = "http://172.20.48.1:3141/root/pypi/+simple/" }
+sdist = { url = "http://172.20.48.1:3141/root/pypi/+f/ff7/0335d468e7eb6/six-1.17.0.tar.gz", hash = "sha256:ff70335d468e7eb6ec65b95b99d3a2836546063f63acc5171de367e834932a81" }
+wheels = [
+    { url = "http://172.20.48.1:3141/root/pypi/+f/472/1f391ed90541f/six-1.17.0-py2.py3-none-any.whl", hash = "sha256:4721f391ed90541fddacab5acf947aa0d3dc7d27b2e1e8eda2be8970586c3274" },
 ]
 
 [[package]]
@@ -1157,4 +1218,13 @@ source = { registry = "http://172.20.48.1:3141/root/pypi/+simple/" }
 sdist = { url = "http://172.20.48.1:3141/root/pypi/+f/0ce/a48d173cc12fa/typing_extensions-4.15.0.tar.gz", hash = "sha256:0cea48d173cc12fa28ecabc3b837ea3cf6f38c6d1136f85cbaaf598984861466" }
 wheels = [
     { url = "http://172.20.48.1:3141/root/pypi/+f/f0f/a19c6845758ab/typing_extensions-4.15.0-py3-none-any.whl", hash = "sha256:f0fa19c6845758ab08074a0cfa8b7aecb71c999ca73d62883bc25cc018c4e548" },
+]
+
+[[package]]
+name = "tzdata"
+version = "2025.3"
+source = { registry = "http://172.20.48.1:3141/root/pypi/+simple/" }
+sdist = { url = "http://172.20.48.1:3141/root/pypi/+f/de3/9c2ca5dc7b034/tzdata-2025.3.tar.gz", hash = "sha256:de39c2ca5dc7b0344f2eba86f49d614019d29f060fc4ebc8a417896a620b56a7" }
+wheels = [
+    { url = "http://172.20.48.1:3141/root/pypi/+f/06a/47e5700f3081a/tzdata-2025.3-py2.py3-none-any.whl", hash = "sha256:06a47e5700f3081aab02b2e513160914ff0694bce9947d6b76ebd6bf57cfc5d1" },
 ]

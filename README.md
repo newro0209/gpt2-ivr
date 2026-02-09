@@ -15,8 +15,8 @@
 1. GPT‑2의 **BPE 토크나이저를 Unigram 토크나이저로 교체**
 2. Unigram 토크나이저가 **BPE와 완전히 동일한**
 
-   * 입력 → token id 시퀀스
-   * token id 시퀀스 → 디코딩 결과
+   - 입력 → token id 시퀀스
+   - token id 시퀀스 → 디코딩 결과
      를 만들도록 학습 (**Tokenizer Distillation**)
 3. 그 위에서 **IVR(In‑place Vocabulary Reassignment)** 수행
 4. embedding 재정렬 후 미세조정
@@ -31,7 +31,7 @@
 
 ## 🗂️ 디렉토리 구조
 
-```
+```text
 gpt2-ivr/
 ├─ README.md                    # 프로젝트 개요, 파이프라인, 실행 방법 문서
 ├─ pyproject.toml               # 패키지 메타데이터, 의존성, 엔트리 포인트 설정
@@ -102,7 +102,7 @@ gpt2-ivr/
 
 모든 단계는 엔트리 포인트를 통해 실행합니다.
 
-```
+```bash
 uv run ivr analyze
 uv run ivr distill-tokenizer
 uv run ivr select
@@ -124,12 +124,12 @@ Tokenizer Distillation 단계는 **반드시 IVR 이전**에 수행됩니다.
 
 ### Distillation 이후 만족해야 하는 조건
 
-| 항목           | 상태                  |
-| ------------ | ------------------- |
-| id ↔ token   | GPT‑2와 동일           |
-| encode 결과    | GPT‑2와 동일           |
-| decode 결과    | GPT‑2와 동일           |
-| tokenizer 모델 | Unigram (merges 없음) |
+| 항목             | 상태                      |
+|----------------|------------------------|
+| id ↔ token     | GPT‑2와 동일              |
+| encode 결과      | GPT‑2와 동일              |
+| decode 결과      | GPT‑2와 동일              |
+| tokenizer 모델   | Unigram (merges 없음)    |
 
 ### 방법
 
@@ -145,7 +145,7 @@ Tokenizer Distillation 단계는 **반드시 IVR 이전**에 수행됩니다.
 
 Distilled Unigram 위에서 저빈도 토큰을 도메인 고빈도 토큰으로 교체합니다.
 
-```
+```text
 replacement_candidates.csv
         ↓
 remap_rules.yaml
@@ -162,7 +162,7 @@ IVR은 “토큰 표현력을 개선하는 단계”입니다.
 
 ## 📁 분석 산출물 (연구 자산)
 
-```
+```text
 artifacts/analysis/reports/
 ├─ token_frequency.parquet
 ├─ replacement_candidates.csv
@@ -176,39 +176,96 @@ artifacts/analysis/reports/
 
 ## 🧩 역할 분리 원칙
 
-| 위치                       | 역할                              |
-| ------------------------ | ------------------------------- |
-| `src/gpt2_ivr/cli.py`    | CLI 엔트리 포인트                    |
-| `src/gpt2_ivr/commands/` | Command 패턴 구현 (파이프라인 오케스트레이션) |
-| `src/gpt2_ivr/analysis/` | 분석 로직 (Research Library)        |
-| `src/gpt2_ivr/tokenizer/`| 토크나이저 로직                      |
-| `src/gpt2_ivr/embedding/`| 임베딩 추출/재배치 로직                 |
-| `src/gpt2_ivr/training/` | 학습 설정 및 실행 로직                  |
-| `artifacts/*`            | 토크나이저/분석/임베딩/학습 산출물           |
-| `scripts/*`              | 파이프라인 외 보조 유틸리티 스크립트         |
+| 위치                         | 역할                                          |
+|------------------------------|----------------------------------------------|
+| `src/gpt2_ivr/cli.py`        | CLI 엔트리 포인트                               |
+| `src/gpt2_ivr/commands/`     | Command 패턴 구현 (파이프라인 오케스트레이션)         |
+| `src/gpt2_ivr/analysis/`     | 분석 로직 (Research Library)                   |
+| `src/gpt2_ivr/tokenizer/`    | 토크나이저 로직                                 |
+| `src/gpt2_ivr/embedding/`    | 임베딩 추출/재배치 로직                           |
+| `src/gpt2_ivr/training/`     | 학습 설정 및 실행 로직                            |
+| `artifacts/*`                | 토크나이저/분석/임베딩/학습 산출물                   |
+| `scripts/*`                  | 파이프라인 외 보조 유틸리티 스크립트                 |
+
+---
+
+## 🏗️ 아키텍처 계층 구조
+
+이 프로젝트는 **Layered Architecture** 패턴을 따라 관심사를 명확히 분리합니다.
+
+### 1️⃣ 프레젠테이션 계층 (Presentation Layer)
+
+- **위치**: `cli.py`
+- **책임**: 사용자 인터페이스(CLI) 제공
+- **역할**:
+  - 사용자 입력을 받아 적절한 Command로 라우팅
+  - argparse 기반 명령행 인터페이스 제공
+  - 배너 출력 및 로깅 초기화
+
+### 2️⃣ 애플리케이션 계층 (Application Layer)
+
+- **위치**: `commands/`
+- **책임**: 명령 오케스트레이션 및 제어 흐름
+- **역할**:
+  - 도메인 로직을 조합하여 비즈니스 유스케이스 구현
+  - 입출력 경로 관리 및 파라미터 전달
+  - Command 패턴을 통한 실행 단위 캡슐화
+
+### 3️⃣ 도메인 계층 (Domain Layer)
+
+- **위치**: `analysis/`, `tokenizer/`, `embedding/`, `training/`
+- **책임**: 핵심 비즈니스 로직 및 알고리즘 구현
+- **역할**:
+  - CLI/Command와 독립적으로 재사용 가능한 로직
+  - 토큰 분석, 토크나이저 증류, 임베딩 처리, 모델 학습 등 핵심 기능
+  - 연구 및 실험의 핵심 자산
+
+### 4️⃣ 유틸리티 계층 (Infrastructure/Utility Layer)
+
+- **위치**: `utils/`
+- **책임**: 공통 유틸리티 및 인프라 지원
+- **역할**:
+  - 로깅 설정 등 횡단 관심사(Cross-cutting Concerns) 처리
+  - 모든 계층에서 공통으로 사용하는 기능 제공
+
+### 계층 간 의존성 규칙
+
+```text
+프레젠테이션 계층 (cli.py)
+        ↓
+애플리케이션 계층 (commands/)
+        ↓
+도메인 계층 (analysis/, tokenizer/, embedding/, training/)
+        ↓
+유틸리티 계층 (utils/)
+```
+
+- **단방향 의존성**: 상위 계층은 하위 계층에만 의존
+- **도메인 독립성**: 도메인 계층은 CLI/Command 계층을 알지 못함
+- **재사용성**: 각 계층은 독립적으로 테스트 및 재사용 가능
 
 ---
 
 ## 🧰 환경 및 도구
 
-| 항목         | 스택                                  |
-| ---------- | ----------------------------------- |
-| 환경 관리      | uv                                  |
-| Python     | 3.13 ~ 3.14                         |
-| Tokenizer  | Hugging Face `tokenizers` (Unigram) |
-| Training   | Hugging Face `accelerate`           |
-| Base Model | `openai-community/gpt2`             |
-| CUDA       | 13.0                                |
-| PyTorch    | 2.10                                |
+| 항목           | 스택                                      |
+|--------------|-----------------------------------------|
+| 환경 관리        | uv                                      |
+| Python       | 3.13 ~ 3.14                             |
+| Tokenizer    | Hugging Face `tokenizers` (Unigram)     |
+| Training     | Hugging Face `accelerate`               |
+| Base Model   | `openai-community/gpt2`                 |
+| CUDA         | 13.0                                    |
+| PyTorch      | 2.10                                    |
 
 ---
 
 ## ✅ 이 구조가 보장하는 것
 
-* BPE → Unigram 안전 이식
-* 그 위에서 IVR 수행
-* 분석 결과의 파일 기반 축적
-* 재현 가능한 엔드투엔드 파이프라인
+- BPE → Unigram 안전 이식
+- 그 위에서 IVR 수행
+- 분석 결과의 파일 기반 축적
+- 재현 가능한 엔드투엔드 파이프라인
 
 ---
 
@@ -226,7 +283,7 @@ uv sync
 
 ### 2️⃣ 코퍼스 준비
 
-```
+```text
 artifacts/corpora/raw/     # 원본 데이터 수집
 artifacts/corpora/cleaned/ # 정제 완료 데이터
 ```
@@ -239,8 +296,8 @@ artifacts/corpora/cleaned/ # 정제 완료 데이터
 uv run ivr analyze
 ```
 
-* GPT‑2 BPE 기준 token id 시퀀스를 생성
-* 산출물: `artifacts/analysis/reports/bpe_token_id_sequences.txt`
+- GPT‑2 BPE 기준 token id 시퀀스를 생성
+- 산출물: `artifacts/analysis/reports/bpe_token_id_sequences.txt`
 
 ---
 
@@ -250,8 +307,8 @@ uv run ivr analyze
 uv run ivr distill-tokenizer
 ```
 
-* BPE와 동일한 encode/decode를 만드는 Unigram tokenizer 생성
-* 산출물: `artifacts/tokenizers/distilled_unigram/`
+- BPE와 동일한 encode/decode를 만드는 Unigram tokenizer 생성
+- 산출물: `artifacts/tokenizers/distilled_unigram/`
 
 ---
 
@@ -261,8 +318,8 @@ uv run ivr distill-tokenizer
 uv run ivr select
 ```
 
-* 저빈도 토큰 분석
-* 산출물: `artifacts/analysis/reports/replacement_candidates.csv`
+- 저빈도 토큰 분석
+- 산출물: `artifacts/analysis/reports/replacement_candidates.csv`
 
 ---
 
@@ -272,8 +329,8 @@ uv run ivr select
 uv run ivr remap
 ```
 
-* IVR 적용 tokenizer 생성
-* 산출물: `artifacts/tokenizers/remapped/`
+- IVR 적용 tokenizer 생성
+- 산출물: `artifacts/tokenizers/remapped/`
 
 ---
 
@@ -283,7 +340,7 @@ uv run ivr remap
 uv run ivr align
 ```
 
-* GPT‑2 embedding을 새 tokenizer id 순서에 맞게 재배치
+- GPT‑2 embedding을 새 tokenizer id 순서에 맞게 재배치
 
 ---
 
@@ -293,4 +350,4 @@ uv run ivr align
 uv run ivr train
 ```
 
-* accelerate 기반 학습 수행
+- accelerate 기반 학습 수행
