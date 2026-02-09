@@ -6,11 +6,6 @@ from pathlib import Path
 from typing import Any
 
 from gpt2_ivr.analysis import analyze_token_frequency
-from gpt2_ivr.constants import (
-    BPE_TOKEN_ID_SEQUENCES_FILE,
-    CORPORA_CLEANED_DIR,
-    TOKEN_FREQUENCY_FILE,
-)
 
 from .base import Command
 
@@ -20,13 +15,13 @@ class AnalyzeCommand(Command):
 
     def __init__(
         self,
-        input_dir: Path = CORPORA_CLEANED_DIR,
-        output_sequences: Path = BPE_TOKEN_ID_SEQUENCES_FILE,
-        output_frequency: Path = TOKEN_FREQUENCY_FILE,
-        model_name: str = "openai-community/gpt2",
-        workers: int = 0,
-        chunk_size: int = 50,
-        max_texts: int = 0,
+        input_dir: Path,
+        output_sequences: Path,
+        output_frequency: Path,
+        model_name: str,
+        workers: int,
+        chunk_size: int,
+        max_texts: int,
     ):
         self.input_dir = input_dir
         self.output_sequences = output_sequences

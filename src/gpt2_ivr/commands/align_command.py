@@ -19,12 +19,12 @@ class AlignCommand(Command):
 
     def __init__(
         self,
-        model_name: str = "openai-community/gpt2",
-        original_tokenizer_dir: Path = Path("artifacts/tokenizers/original"),
-        remapped_tokenizer_dir: Path = Path("artifacts/tokenizers/remapped"),
-        remap_rules_path: Path = Path("src/gpt2_ivr/tokenizer/remap_rules.yaml"),
-        embeddings_output_dir: Path = Path("artifacts/embeddings"),
-        init_strategy: str = "mean",
+        model_name: str,
+        original_tokenizer_dir: Path,
+        remapped_tokenizer_dir: Path,
+        remap_rules_path: Path,
+        embeddings_output_dir: Path,
+        init_strategy: str,
     ) -> None:
         self.logger = get_logger("gpt2_ivr.align")
         self.model_name = model_name

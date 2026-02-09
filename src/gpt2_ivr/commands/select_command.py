@@ -6,12 +6,6 @@ from pathlib import Path
 from typing import Any
 
 from gpt2_ivr.analysis import select_replacement_candidates
-from gpt2_ivr.constants import (
-    BPE_TOKEN_ID_SEQUENCES_FILE,
-    REPLACEMENT_CANDIDATES_FILE,
-    SELECTION_LOG_FILE,
-    TOKEN_FREQUENCY_FILE,
-)
 
 from .base import Command
 
@@ -21,13 +15,13 @@ class SelectCommand(Command):
 
     def __init__(
         self,
-        frequency_path: Path = TOKEN_FREQUENCY_FILE,
-        sequences_path: Path = BPE_TOKEN_ID_SEQUENCES_FILE,
-        output_csv: Path = REPLACEMENT_CANDIDATES_FILE,
-        output_log: Path = SELECTION_LOG_FILE,
-        model_name: str = "openai-community/gpt2",
-        max_candidates: int = 1000,
-        min_token_len: int = 2,
+        frequency_path: Path,
+        sequences_path: Path,
+        output_csv: Path,
+        output_log: Path,
+        model_name: str,
+        max_candidates: int,
+        min_token_len: int,
     ):
         self.frequency_path = frequency_path
         self.sequences_path = sequences_path

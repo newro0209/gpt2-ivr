@@ -5,11 +5,6 @@ from __future__ import annotations
 from pathlib import Path
 from typing import Any
 
-from gpt2_ivr.constants import (
-    CORPORA_CLEANED_DIR,
-    TOKENIZER_DISTILLED_UNIGRAM_DIR,
-    TOKENIZER_ORIGINAL_DIR,
-)
 from gpt2_ivr.tokenizer import distill_unigram_tokenizer
 
 from .base import Command
@@ -20,11 +15,11 @@ class DistillCommand(Command):
 
     def __init__(
         self,
-        original_tokenizer_dir: Path = TOKENIZER_ORIGINAL_DIR,
-        distilled_tokenizer_dir: Path = TOKENIZER_DISTILLED_UNIGRAM_DIR,
-        corpus_dir: Path = CORPORA_CLEANED_DIR,
-        vocab_size: int = 50257,
-        model_name: str = "openai-community/gpt2",
+        original_tokenizer_dir: Path,
+        distilled_tokenizer_dir: Path,
+        corpus_dir: Path,
+        vocab_size: int,
+        model_name: str,
     ):
         self.original_tokenizer_dir = original_tokenizer_dir
         self.distilled_tokenizer_dir = distilled_tokenizer_dir
