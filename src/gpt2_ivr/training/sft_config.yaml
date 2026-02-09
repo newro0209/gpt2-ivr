@@ -2,14 +2,15 @@
 # 학습 관련 모든 설정은 이 파일을 통해 관리합니다.
 
 # 모델 및 토크나이저 경로
+# 경로 상수는 src/gpt2_ivr/constants.py에서 중앙 관리됩니다.
 model_name_or_path: "openai-community/gpt2"
-tokenizer_name_or_path: "artifacts/tokenizers/remapped/" # `uv run ivr remap` 실행 후 생성된 토크나이저
+tokenizer_name_or_path: "artifacts/tokenizers/remapped/" # TOKENIZER_REMAPPED_DIR (`uv run ivr remap` 실행 후 생성)
 
 # 데이터셋 경로
-dataset_name_or_path: "artifacts/corpora/cleaned/"
+dataset_name_or_path: "artifacts/corpora/cleaned/" # CORPORA_CLEANED_DIR
 
 # 학습 하이퍼파라미터
-output_dir: "artifacts/training/sft_checkpoint"
+output_dir: "artifacts/training/sft_checkpoint" # TRAINING_CHECKPOINT_DIR
 overwrite_output_dir: true
 num_train_epochs: 3
 per_device_train_batch_size: 8
