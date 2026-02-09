@@ -94,11 +94,13 @@ def initialize_new_token_embeddings(
 
     # 5. 초기화 전략에 따라 임베딩 초기화
     if len(new_tokens) > 0:
+        # 0이 아닌 임베딩 마스크 계산 (mean/random 전략에서 공통 사용)
+        non_zero_mask = ~torch.all(aligned_wte == 0, dim=1)
+        has_non_zero = non_zero_mask.sum() > 0
+
         if init_strategy == "mean":
             # 기존 임베딩들의 평균으로 초기화
-            # 0이 아닌 임베딩들만 고려
-            non_zero_mask = ~torch.all(aligned_wte == 0, dim=1)
-            if non_zero_mask.sum() > 0:
+            if has_non_zero:
                 mean_embedding = aligned_wte[non_zero_mask].mean(dim=0)
             else:
                 mean_embedding = torch.zeros(embedding_dim)
@@ -111,8 +113,7 @@ def initialize_new_token_embeddings(
 
         elif init_strategy == "random":
             # 정규분포로부터 랜덤 초기화
-            non_zero_mask = ~torch.all(aligned_wte == 0, dim=1)
-            if non_zero_mask.sum() > 0:
+            if has_non_zero:
                 std = aligned_wte[non_zero_mask].std().item()
             else:
                 std = 0.02  # 기본 표준편차 (GPT-2 초기화 값)

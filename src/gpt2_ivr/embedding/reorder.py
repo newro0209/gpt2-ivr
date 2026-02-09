@@ -67,22 +67,19 @@ def reorder_embeddings(
     new_vocab_size = remapped_tokenizer.get_vocab_size()
     logger.info("새로운 vocab 크기: %d", new_vocab_size)
 
-    # 새 임베딩을 0으로 초기화 (명시적으로 초기화)
-    if new_vocab_size == vocab_size:
-        aligned_wte = torch.zeros(
-            new_vocab_size, embedding_dim, dtype=original_wte.dtype
-        )
-        logger.info("✅ Vocab 크기가 동일하여 zero로 초기화 후 재할당")
-    elif new_vocab_size > vocab_size:
-        # Vocab이 증가한 경우
-        aligned_wte = torch.zeros(
-            new_vocab_size, embedding_dim, dtype=original_wte.dtype
-        )
-        logger.info("⚠️ Vocab 크기 증가: %d -> %d", vocab_size, new_vocab_size)
-    else:
+    # Vocab 크기 검증
+    if new_vocab_size < vocab_size:
         raise ValueError(
             f"새 vocab 크기({new_vocab_size})가 원본({vocab_size})보다 작습니다."
         )
+
+    # 새 임베딩을 0으로 초기화
+    aligned_wte = torch.zeros(new_vocab_size, embedding_dim, dtype=original_wte.dtype)
+
+    if new_vocab_size == vocab_size:
+        logger.info("✅ Vocab 크기 동일: %d", vocab_size)
+    else:
+        logger.info("⚠️ Vocab 크기 증가: %d -> %d", vocab_size, new_vocab_size)
 
     # 5. 먼저 기존 토큰들의 임베딩을 복사 (remap되지 않은 토큰 보존)
     original_vocab = original_tokenizer.get_vocab()
