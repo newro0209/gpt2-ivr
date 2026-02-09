@@ -241,19 +241,21 @@ def _create_train_command(args: argparse.Namespace) -> TrainCommand:
     return TrainCommand()
 
 
+# 커맨드 팩토리 매핑 딕셔너리
+_COMMAND_FACTORIES = {
+    "analyze": _create_analyze_command,
+    "distill-tokenizer": _create_distill_command,
+    "select": _create_select_command,
+    "remap": _create_remap_command,
+    "align": _create_align_command,
+    "train": _create_train_command,
+}
+
+
 def create_command(command_name: str, args: argparse.Namespace) -> Command:
     """커맨드 이름에 해당하는 Command 객체를 생성한다."""
-    command_factories = {
-        "analyze": _create_analyze_command,
-        "distill-tokenizer": _create_distill_command,
-        "select": _create_select_command,
-        "remap": _create_remap_command,
-        "align": _create_align_command,
-        "train": _create_train_command,
-    }
-
-    if command_name in command_factories:
-        return command_factories[command_name](args)
+    if command_name in _COMMAND_FACTORIES:
+        return _COMMAND_FACTORIES[command_name](args)
 
     raise NotImplementedError(f"'{command_name}'는 유효하지 않은 커맨드입니다.")
 
