@@ -354,7 +354,41 @@ uv run ivr remap
 uv run ivr align
 ```
 
-- GPT‑2 embedding을 새 tokenizer id 순서에 맞게 재배치
+- GPT‑2 모델에서 토큰 임베딩(wte)과 위치 임베딩(wpe) 추출
+- Remap 규칙에 따라 임베딩 재정렬
+- 신규 추가된 토큰에 대한 임베딩 초기화
+- 산출물: `artifacts/embeddings/`
+
+#### 주요 옵션
+
+```bash
+uv run ivr align \
+  --model-name openai-community/gpt2 \
+  --original-tokenizer-dir artifacts/tokenizers/original \
+  --remapped-tokenizer-dir artifacts/tokenizers/remapped \
+  --remap-rules-path src/gpt2_ivr/tokenizer/remap_rules.yaml \
+  --embeddings-output-dir artifacts/embeddings \
+  --init-strategy mean
+```
+
+- `--init-strategy`: 신규 토큰 임베딩 초기화 전략
+  - `mean`: 기존 임베딩 평균값 사용 (기본값)
+  - `random`: 정규분포 랜덤 초기화
+  - `zeros`: 0으로 초기화
+
+#### 처리 단계
+
+1. **Extract**: 원본 GPT-2 모델에서 임베딩 추출
+2. **Reorder**: Remap 규칙에 따라 토큰 임베딩 재배치
+3. **Initialize**: 신규 토큰 임베딩 초기화
+
+#### 산출물
+
+- `artifacts/embeddings/original_wte.pt` - 원본 토큰 임베딩
+- `artifacts/embeddings/original_wpe.pt` - 원본 위치 임베딩
+- `artifacts/embeddings/aligned_wte.pt` - 재정렬된 토큰 임베딩
+- `artifacts/embeddings/final_wte.pt` - 최종 임베딩 (초기화 완료)
+- `artifacts/embeddings/*.json` - 각 단계별 메타데이터
 
 ---
 
