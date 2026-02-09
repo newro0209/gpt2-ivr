@@ -215,13 +215,13 @@ def analyze_token_frequency(
     input_files = find_input_files(input_dir, inputs)
     if not input_files:
         raise SystemExit("입력 파일을 찾을 수 없습니다.")
-    logger.info("📂 입력 파일 %d개를 탐색했습니다.", len(input_files))
+    logger.info("입력 파일 %d개 탐색 완료", len(input_files))
 
     # 2) 텍스트 스트림 구성
     texts = iter_texts(input_files, text_key, encoding)
     if max_texts > 0:
         texts = islice(texts, max_texts)
-        logger.info("⚠️  최대 %d개 텍스트만 처리합니다.", max_texts)
+        logger.info("최대 %d개 텍스트만 처리", max_texts)
 
     # 3) 토크나이저 로드
     tokenizer_files = list(tokenizer_dir.glob("*")) if tokenizer_dir.exists() else []
@@ -232,7 +232,7 @@ def analyze_token_frequency(
     if not has_tokenizer_files:
         raise FileNotFoundError(f"원본 토크나이저 파일이 없습니다: {tokenizer_dir}")
 
-    logger.info("🔤 GPT-2 토크나이저를 로드합니다: %s", tokenizer_dir)
+    logger.info("토크나이저 로드: %s", tokenizer_dir)
     tokenizer = GPT2Tokenizer.from_pretrained(str(tokenizer_dir))
 
     # 4) 병렬 처리 파라미터 계산
@@ -240,7 +240,7 @@ def analyze_token_frequency(
         workers = max(1, (os.cpu_count() or 1) - 1)
     if chunk_size <= 0:
         chunk_size = workers * 32
-    logger.info("🔧 토큰화 설정: workers=%d, chunk_size=%d", workers, chunk_size)
+    logger.info("토큰화 설정: workers=%d, chunk_size=%d", workers, chunk_size)
 
     # 5) 토큰화 이터레이터 생성 (빈도 집계는 호출자에서 수행)
     encoded_chunks_iterator = iter_encoded_chunks(

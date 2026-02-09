@@ -40,48 +40,39 @@ def reorder_embeddings(
     if logger is None:
         logger = logging.getLogger("gpt2_ivr.embedding.reorder")
 
-    logger.info("🔄 임베딩 재정렬 시작")
+    logger.info("임베딩 재정렬 시작")
 
     # 1. 원본 임베딩 로드
-    logger.info("📥 원본 임베딩 로딩: %s", original_wte_path)
+    logger.info("원본 임베딩 로드: %s", original_wte_path)
     original_wte = torch.load(original_wte_path)
     vocab_size, embedding_dim = original_wte.shape
-    logger.info("원본 임베딩 shape: (%d, %d)", vocab_size, embedding_dim)
+    logger.info("임베딩 shape: (%d, %d)", vocab_size, embedding_dim)
 
     # 2. 토크나이저 로드
-    logger.info("📥 원본 토크나이저 로딩: %s", original_tokenizer_dir)
+    logger.info("원본 토크나이저 로드: %s", original_tokenizer_dir)
     original_tokenizer = Tokenizer.from_file(
         str(original_tokenizer_dir / "tokenizer.json")
     )
 
-    logger.info("📥 Remapped 토크나이저 로딩: %s", remapped_tokenizer_dir)
-    remapped_tokenizer = Tokenizer.from_file(
-        str(remapped_tokenizer_dir / "tokenizer.json")
-    )
+    logger.info("재할당 토크나이저 로드: %s", remapped_tokenizer_dir)
+    remapped_tokenizer = Tokenizer.from_file(str(remapped_tokenizer_dir / "tokenizer.json"))
 
     # 3. Remap 규칙 로드
-    logger.info("📥 Remap 규칙 로딩: %s", remap_rules_path)
+    logger.info("재할당 규칙 로드: %s", remap_rules_path)
     with open(remap_rules_path, "r", encoding="utf-8") as f:
         remap_rules = yaml.safe_load(f) or {}
-    logger.info("총 %d개의 remap 규칙 발견", len(remap_rules))
+    logger.info("재할당 규칙 %d개 로드", len(remap_rules))
 
     # 4. 새로운 임베딩 텐서 생성
     new_vocab_size = remapped_tokenizer.get_vocab_size()
-    logger.info("새로운 vocab 크기: %d", new_vocab_size)
+    logger.info("vocab 크기: %d -> %d", vocab_size, new_vocab_size)
 
     # Vocab 크기 검증
     if new_vocab_size < vocab_size:
-        raise ValueError(
-            f"새 vocab 크기({new_vocab_size})가 원본({vocab_size})보다 작습니다."
-        )
+        raise ValueError(f"새 vocab 크기({new_vocab_size})가 원본({vocab_size})보다 작습니다.")
 
     # 새 임베딩을 0으로 초기화
     aligned_wte = torch.zeros(new_vocab_size, embedding_dim, dtype=original_wte.dtype)
-
-    if new_vocab_size == vocab_size:
-        logger.info("✅ Vocab 크기 동일: %d", vocab_size)
-    else:
-        logger.info("⚠️ Vocab 크기 증가: %d -> %d", vocab_size, new_vocab_size)
 
     # 5. 기존 토큰들의 임베딩을 복사 (remap되지 않은 토큰 보존)
     original_vocab = original_tokenizer.get_vocab()
@@ -94,7 +85,7 @@ def reorder_embeddings(
             aligned_wte[new_id] = original_wte[old_id].clone()
             preserved_count += 1
 
-    logger.info("✅ %d개의 기존 토큰 임베딩 보존", preserved_count)
+    logger.info("기존 토큰 임베딩 %d개 보존", preserved_count)
 
     # 6. Remap 규칙에 따라 임베딩 재배치
     remap_count = 0
@@ -113,14 +104,14 @@ def reorder_embeddings(
                 new_id,
             )
 
-    logger.info("✅ 총 %d개의 임베딩 재할당 완료", remap_count)
+    logger.info("임베딩 재할당 %d개 완료", remap_count)
 
     # 7. 출력 디렉토리 생성 및 저장
     output_dir.mkdir(parents=True, exist_ok=True)
 
     aligned_wte_path = output_dir / "aligned_wte.pt"
     torch.save(aligned_wte, aligned_wte_path)
-    logger.info("💾 재정렬된 임베딩 저장: %s", aligned_wte_path)
+    logger.info("재정렬 임베딩 저장: %s", aligned_wte_path)
 
     # 8. 메타데이터 저장
     metadata = {
@@ -135,7 +126,7 @@ def reorder_embeddings(
     metadata_path = output_dir / "reorder_metadata.json"
     with open(metadata_path, "w", encoding="utf-8") as f:
         json.dump(metadata, f, indent=2, ensure_ascii=False)
-    logger.info("📋 메타데이터 저장: %s", metadata_path)
+    logger.info("메타데이터 저장: %s", metadata_path)
 
     return {
         "aligned_wte": aligned_wte_path,
