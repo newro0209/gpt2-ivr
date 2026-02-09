@@ -16,17 +16,19 @@ from typing import TypedDict, cast
 import pyarrow.parquet as pq
 from transformers import GPT2Tokenizer
 
-from gpt2_ivr.utils.logging_config import (
-    create_byte_progress,
-    create_progress,
-    get_logger,
-)
-
-logger = get_logger(__name__)
+logger = logging.getLogger(__name__)
 
 
 class SelectionResult(TypedDict):
-    """선정 결과 타입"""
+    """선정 결과 타입.
+
+    Attributes:
+        pairs_count: 교체 후보 쌍 개수
+        sacrifice_count: 희생 후보 개수
+        new_token_count: 신규 토큰 후보 개수
+        csv_path: CSV 파일 경로
+        log_path: 로그 파일 경로
+    """
 
     pairs_count: int
     sacrifice_count: int
@@ -35,14 +37,15 @@ class SelectionResult(TypedDict):
     log_path: Path
 
 
-# ---------------------------------------------------------------------------
-# 데이터 구조
-# ---------------------------------------------------------------------------
-
-
 @dataclass(frozen=True, slots=True)
 class SacrificeCandidate:
-    """희생(저빈도) 후보 토큰."""
+    """희생(저빈도) 후보 토큰.
+
+    Attributes:
+        token_id: 토큰 ID
+        token_str: 토큰 문자열 (디코딩 결과)
+        frequency: 코퍼스 출현 빈도
+    """
 
     token_id: int
     token_str: str
@@ -51,7 +54,14 @@ class SacrificeCandidate:
 
 @dataclass(frozen=True, slots=True)
 class NewTokenCandidate:
-    """신규(바이그램 병합) 토큰 후보."""
+    """신규(바이그램 병합) 토큰 후보.
+
+    Attributes:
+        merged_str: 병합된 문자열
+        left_id: 왼쪽 토큰 ID
+        right_id: 오른쪽 토큰 ID
+        bigram_freq: 바이그램 출현 빈도
+    """
 
     merged_str: str
     left_id: int
@@ -61,7 +71,14 @@ class NewTokenCandidate:
 
 @dataclass(frozen=True, slots=True)
 class ReplacementPair:
-    """교체 후보 쌍: 희생 토큰 → 신규 토큰."""
+    """교체 후보 쌍: 희생 토큰 → 신규 토큰.
+
+    Attributes:
+        rank: 순위 (1부터 시작)
+        sacrifice: 희생 후보 토큰
+        new_token: 신규 토큰 후보
+        score: 교체 가치 점수
+    """
 
     rank: int
     sacrifice: SacrificeCandidate
@@ -69,13 +86,15 @@ class ReplacementPair:
     score: float
 
 
-# ---------------------------------------------------------------------------
-# 유틸리티
-# ---------------------------------------------------------------------------
-
-
 def load_frequency(path: Path) -> dict[int, int]:
-    """token_frequency.parquet 에서 {token_id: frequency} 사전을 로드한다."""
+    """token_frequency.parquet 에서 {token_id: frequency} 사전을 로드한다.
+
+    Args:
+        path: Parquet 파일 경로
+
+    Returns:
+        토큰 ID를 키로, 빈도를 값으로 하는 딕셔너리
+    """
     table = pq.read_table(path, columns=["token_id", "frequency"])
     token_ids: list[int] = table.column("token_id").to_pylist()
     frequencies: list[int] = table.column("frequency").to_pylist()
@@ -92,14 +111,21 @@ def get_protected_token_ids(
         - 스페셜 토큰 (``<|endoftext|>`` 등)
         - 디코딩 시 *min_token_len* 미만 문자열로 변환되는 토큰
           (바이트 수준 단일 문자 토큰 포함)
+
+    Args:
+        tokenizer: GPT-2 토크나이저
+        min_token_len: 보호 대상 최소 길이 (이 길이 미만은 보호)
+
+    Returns:
+        보호 대상 토큰 ID 집합
     """
     protected: set[int] = set()
 
-    # 스페셜 토큰 보호
+    # 1) 스페셜 토큰 보호
     for token_id in tokenizer.all_special_ids:
         protected.add(token_id)
 
-    # 짧은 토큰 보호 (바이트 수준 토큰 포함)
+    # 2) 짧은 토큰 보호 (바이트 수준 토큰 포함)
     vocab_size: int = tokenizer.vocab_size
     for token_id in range(vocab_size):
         decoded = cast(str, tokenizer.decode([token_id]))
@@ -107,11 +133,6 @@ def get_protected_token_ids(
             protected.add(token_id)
 
     return protected
-
-
-# ---------------------------------------------------------------------------
-# 희생 후보 선정
-# ---------------------------------------------------------------------------
 
 
 def select_sacrifice_candidates(
@@ -124,6 +145,15 @@ def select_sacrifice_candidates(
 
     보호 대상을 제외한 전체 vocab 에서 빈도가 낮은 순으로 정렬하여
     상위 *max_candidates* 개를 반환한다. 빈도 0(코퍼스에 미출현)인 토큰이 최우선.
+
+    Args:
+        freq: 토큰 ID별 빈도 딕셔너리
+        tokenizer: GPT-2 토크나이저
+        protected_ids: 보호 대상 토큰 ID 집합
+        max_candidates: 최대 후보 개수
+
+    Returns:
+        빈도 오름차순 정렬된 희생 후보 리스트
     """
     vocab_size: int = tokenizer.vocab_size
     candidates: list[SacrificeCandidate] = []
@@ -140,31 +170,29 @@ def select_sacrifice_candidates(
     return candidates[:max_candidates]
 
 
-# ---------------------------------------------------------------------------
-# 바이그램 기반 신규 토큰 후보 탐색
-# ---------------------------------------------------------------------------
-
-
 def count_bigrams(
     sequences_path: Path,
     logger: logging.Logger,
 ) -> Counter[tuple[int, int]]:
-    """bpe_token_id_sequences.txt 에서 인접 토큰 바이그램 빈도를 집계한다."""
+    """bpe_token_id_sequences.txt 에서 인접 토큰 바이그램 빈도를 집계한다.
+
+    Args:
+        sequences_path: 토큰 시퀀스 파일 경로
+        logger: 로거 인스턴스
+
+    Returns:
+        (left_id, right_id) 튜플을 키로 하는 빈도 카운터
+    """
     counter: Counter[tuple[int, int]] = Counter()
 
-    file_size = sequences_path.stat().st_size
     with sequences_path.open("r", encoding="utf-8") as handle:
-        total = file_size if file_size > 0 else None
-        with create_byte_progress() as progress:
-            task_id = progress.add_task("🔍 바이그램 집계", total=total)
-            for line in handle:
-                progress.advance(task_id, len(line.encode("utf-8")))
-                parts = line.split()
-                if len(parts) < 2:
-                    continue
-                ids = [int(p) for p in parts]
-                for i in range(len(ids) - 1):
-                    counter[(ids[i], ids[i + 1])] += 1
+        for line in handle:
+            parts = line.split()
+            if len(parts) < 2:
+                continue
+            ids = [int(p) for p in parts]
+            for i in range(len(ids) - 1):
+                counter[(ids[i], ids[i + 1])] += 1
 
     logger.info("고유 바이그램 %d개를 집계했습니다.", len(counter))
     return counter
@@ -180,54 +208,52 @@ def discover_new_token_candidates(
 
     바이그램을 디코딩하여 병합 문자열을 생성하고,
     해당 문자열이 이미 단일 토큰으로 존재하는 경우는 제외한다.
+
+    Args:
+        bigram_counts: 바이그램 빈도 카운터
+        tokenizer: GPT-2 토크나이저
+        max_candidates: 최대 후보 개수
+        logger: 로거 인스턴스
+
+    Returns:
+        빈도 내림차순 정렬된 신규 토큰 후보 리스트
     """
-    # 상위 바이그램만 검사 (필요량의 10 배 한도)
     check_limit = max_candidates * 10
     top_bigrams = bigram_counts.most_common(check_limit)
 
     seen_merged: set[str] = set()
     candidates: list[NewTokenCandidate] = []
 
-    with create_progress() as progress:
-        task_id = progress.add_task("🧩 신규 토큰 후보 탐색", total=None)
-        for (left_id, right_id), freq in top_bigrams:
-            progress.advance(task_id)
-            if len(candidates) >= max_candidates:
-                break
+    # 1) 상위 바이그램 순회하며 후보 선정
+    # 2) 병합 문자열이 비어있거나 중복이거나 이미 단일 토큰인 경우 제외
+    for (left_id, right_id), freq in top_bigrams:
+        if len(candidates) >= max_candidates:
+            break
 
-            # 바이그램 디코딩 → 병합 문자열
-            merged_str = cast(str, tokenizer.decode([left_id, right_id]))
+        merged_str = cast(str, tokenizer.decode([left_id, right_id]))
 
-            # 빈 문자열 또는 공백만 있는 경우 제외
-            if not merged_str.strip():
-                continue
+        if not merged_str.strip():
+            continue
 
-            # 동일 병합 문자열 중복 제외
-            if merged_str in seen_merged:
-                continue
+        if merged_str in seen_merged:
+            continue
 
-            # 이미 단일 토큰으로 존재하면 제외
-            encoded: list[int] = tokenizer.encode(merged_str, add_special_tokens=False)
-            if len(encoded) <= 1:
-                continue
+        encoded: list[int] = tokenizer.encode(merged_str, add_special_tokens=False)
+        if len(encoded) <= 1:
+            continue
 
-            seen_merged.add(merged_str)
-            candidates.append(
-                NewTokenCandidate(
-                    merged_str=merged_str,
-                    left_id=left_id,
-                    right_id=right_id,
-                    bigram_freq=freq,
-                )
+        seen_merged.add(merged_str)
+        candidates.append(
+            NewTokenCandidate(
+                merged_str=merged_str,
+                left_id=left_id,
+                right_id=right_id,
+                bigram_freq=freq,
             )
+        )
 
     logger.info("신규 토큰 후보 %d개를 선정했습니다.", len(candidates))
     return candidates
-
-
-# ---------------------------------------------------------------------------
-# 매칭 및 출력
-# ---------------------------------------------------------------------------
 
 
 def match_candidates(
@@ -237,6 +263,13 @@ def match_candidates(
     """희생 후보와 신규 토큰 후보를 1:1 순위 매칭한다.
 
     점수 = ``bigram_freq / (sacrifice_freq + 1)`` — 높을수록 교체 가치가 크다.
+
+    Args:
+        sacrifices: 희생 후보 리스트 (빈도 오름차순 정렬)
+        new_tokens: 신규 토큰 후보 리스트 (빈도 내림차순 정렬)
+
+    Returns:
+        교체 후보 쌍 리스트
     """
     count = min(len(sacrifices), len(new_tokens))
     pairs: list[ReplacementPair] = []
@@ -261,7 +294,12 @@ def write_replacement_csv(
     pairs: list[ReplacementPair],
     output_path: Path,
 ) -> None:
-    """replacement_candidates.csv 를 저장한다."""
+    """replacement_candidates.csv 를 저장한다.
+
+    Args:
+        pairs: 교체 후보 쌍 리스트
+        output_path: CSV 파일 저장 경로
+    """
     output_path.parent.mkdir(parents=True, exist_ok=True)
 
     fieldnames = [
@@ -303,7 +341,16 @@ def write_selection_log(
     total_bigrams: int,
     output_path: Path,
 ) -> None:
-    """selection_log.md 를 저장한다."""
+    """selection_log.md 를 저장한다.
+
+    Args:
+        pairs: 교체 후보 쌍 리스트
+        total_vocab: 전체 어휘 크기
+        total_protected: 보호 토큰 개수
+        total_sacrifice_pool: 희생 후보 풀 크기
+        total_bigrams: 고유 바이그램 개수
+        output_path: 마크다운 로그 파일 경로
+    """
     output_path.parent.mkdir(parents=True, exist_ok=True)
 
     lines: list[str] = [
@@ -334,7 +381,6 @@ def write_selection_log(
 
     display_count = min(len(pairs), 50)
     for pair in pairs[:display_count]:
-        # 마크다운 파이프 이스케이프
         sac_str = pair.sacrifice.token_str.replace("|", "\\|")
         new_str = pair.new_token.merged_str.replace("|", "\\|")
         lines.append(
@@ -364,20 +410,26 @@ def select_replacement_candidates(
     tokenizer_dir: Path,
     max_candidates: int,
     min_token_len: int,
-) -> SelectionResult:
+) -> tuple[
+    Counter[tuple[int, int]],
+    list[NewTokenCandidate],
+    GPT2Tokenizer,
+    list[SacrificeCandidate],
+    list[ReplacementPair],
+]:
     """IVR 교체 후보를 선정한다.
 
     Args:
         frequency_path: 토큰 빈도 parquet 파일 경로
         sequences_path: BPE 토큰 시퀀스 파일 경로
-        output_csv: 교체 후보 CSV 저장 경로
-        output_log: 선정 로그 저장 경로
+        output_csv: 교체 후보 CSV 저장 경로 (SelectCommand에서 사용)
+        output_log: 선정 로그 저장 경로 (SelectCommand에서 사용)
         tokenizer_dir: 원본 토크나이저 디렉토리
         max_candidates: 최대 후보 개수
         min_token_len: 보호 토큰 최소 길이
 
     Returns:
-        선정 결과 정보를 담은 딕셔너리
+        필요한 집계 데이터 튜플: bigram_counts, new_tokens, tokenizer, sacrifices, pairs
 
     Raises:
         FileNotFoundError: 입력 파일 또는 원본 토크나이저가 없는 경우
@@ -433,24 +485,10 @@ def select_replacement_candidates(
     pairs = match_candidates(sacrifices, new_tokens)
     logger.info("✅ 교체 후보 %d쌍을 매칭했습니다.", len(pairs))
 
-    # 8) 결과 저장
-    write_replacement_csv(pairs, output_csv)
-    logger.info("📄 교체 후보 CSV 저장 완료: %s", output_csv)
-
-    write_selection_log(
-        pairs=pairs,
-        total_vocab=tokenizer.vocab_size,
-        total_protected=len(protected_ids),
-        total_sacrifice_pool=tokenizer.vocab_size - len(protected_ids),
-        total_bigrams=len(bigram_counts),
-        output_path=output_log,
-    )
-    logger.info("📝 선정 로그 저장 완료: %s", output_log)
-
-    return SelectionResult(
-        pairs_count=len(pairs),
-        sacrifice_count=len(sacrifices),
-        new_token_count=len(new_tokens),
-        csv_path=output_csv,
-        log_path=output_log,
+    return (
+        bigram_counts,
+        new_tokens,
+        tokenizer,
+        sacrifices,
+        pairs,
     )

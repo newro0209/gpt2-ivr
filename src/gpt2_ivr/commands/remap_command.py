@@ -1,4 +1,8 @@
-"""토크나이저 재할당 커맨드"""
+"""토크나이저 재할당 커맨드.
+
+재할당 규칙(YAML)을 증류된 Unigram 토크나이저에 적용하여
+희생 토큰을 신규 토큰으로 교체한 재할당 토크나이저를 생성한다.
+"""
 
 from __future__ import annotations
 
@@ -11,11 +15,21 @@ import yaml
 from tokenizers import Tokenizer
 
 from gpt2_ivr.commands.base import Command
-from gpt2_ivr.utils.logging_config import get_logger
 
 
 class RemapCommand(Command):
-    """토큰 재할당 규칙 적용 커맨드"""
+    """토큰 재할당 규칙 적용 커맨드.
+
+    YAML 재할당 규칙에 따라 증류 토크나이저에 신규 토큰을 추가하고
+    재할당된 토크나이저를 저장한다.
+
+    Attributes:
+        logger: 로거 인스턴스
+        distilled_tokenizer_path: 증류된 토크나이저 디렉토리
+        remapped_tokenizer_path: 재할당 토크나이저 저장 디렉토리
+        remap_rules_path: 재할당 규칙 YAML 파일 경로
+        replacement_candidates_path: 교체 후보 CSV 경로
+    """
 
     def __init__(
         self,
@@ -24,14 +38,28 @@ class RemapCommand(Command):
         remap_rules_path: Path,
         replacement_candidates_path: Path,
     ) -> None:
-        self.logger = get_logger("gpt2_ivr.remap")
+        self.logger = logging.getLogger("gpt2_ivr.remap")
         self.distilled_tokenizer_path = distilled_tokenizer_dir
         self.remapped_tokenizer_path = remapped_tokenizer_dir
         self.remap_rules_path = remap_rules_path
         self.replacement_candidates_path = replacement_candidates_path
 
     def execute(self, **kwargs: Any) -> dict[str, Any]:
-        """커맨드 실행 로직"""
+        """토큰 재할당을 실행한다.
+
+        증류 토크나이저에 재할당 규칙을 적용하여 신규 토큰을 추가하고
+        재할당 토크나이저를 저장한다.
+
+        Args:
+            **kwargs: 사용되지 않음
+
+        Returns:
+            실행 결과 딕셔너리 (status, remapped_tokenizer_path)
+
+        Raises:
+            FileNotFoundError: 증류 토크나이저 또는 재할당 규칙 파일이 없는 경우
+            ValueError: 재할당 규칙 형식이 올바르지 않은 경우
+        """
         self.logger.info("🚀 remap 단계를 시작합니다.")
 
         # 1. 증류 토크나이저 로드
@@ -161,5 +189,9 @@ class RemapCommand(Command):
         }
 
     def get_name(self) -> str:
-        """커맨드 이름 반환"""
+        """커맨드 이름을 반환한다.
+
+        Returns:
+            커맨드 이름 "remap"
+        """
         return "remap"

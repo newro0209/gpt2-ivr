@@ -1,7 +1,13 @@
-"""토크나이저 증류 비즈니스 로직"""
+"""토크나이저 증류 비즈니스 로직.
+
+GPT-2 BPE 토크나이저를 Unigram 모델로 증류하여 원본과 유사한 동작을 하지만
+확률 기반 토큰 분할이 가능한 토크나이저를 생성한다. 원본의 어휘 크기를 유지하면서
+코퍼스를 기반으로 Unigram 모델을 학습한다.
+"""
 
 from __future__ import annotations
 
+import logging
 import os
 from pathlib import Path
 from typing import Iterator, TypedDict, cast
@@ -9,16 +15,20 @@ from typing import Iterator, TypedDict, cast
 from tokenizers import Tokenizer, models, pre_tokenizers, trainers
 from transformers import AutoTokenizer, PreTrainedTokenizerBase, PreTrainedTokenizerFast
 
-from gpt2_ivr.utils.logging_config import get_logger
-
 # 병렬 처리 활성화
 os.environ["TOKENIZERS_PARALLELISM"] = "true"
 
-logger = get_logger(__name__)
+logger = logging.getLogger(__name__)
 
 
 class DistillResult(TypedDict):
-    """증류 결과 타입"""
+    """증류 결과 타입.
+
+    Attributes:
+        output_dir: 증류된 토크나이저 저장 디렉토리
+        vocab_size: 증류된 토크나이저의 어휘 크기
+        original_vocab_size: 원본 토크나이저의 어휘 크기
+    """
 
     output_dir: Path
     vocab_size: int
@@ -85,7 +95,6 @@ def distill_unigram_tokenizer(
     logger.info("🚀 Unigram 토크나이저 Distillation을 시작합니다.")
 
     # 1. GPT-2 BPE 토크나이저 로드
-    # init 단계에서 내려받은 로컬 토크나이저만 사용한다.
     tokenizer_files = (
         list(original_tokenizer_dir.glob("*"))
         if original_tokenizer_dir.exists()
@@ -121,14 +130,11 @@ def distill_unigram_tokenizer(
 
     # 2. Unigram 토크나이저 초기화
     tokenizer = Tokenizer(models.Unigram())
-
-    # 사전 토크나이저 설정: ByteLevel PreTokenizer
     tokenizer.pre_tokenizer = pre_tokenizers.ByteLevel(add_prefix_space=False)
     logger.info("✨ Unigram 토크나이저와 ByteLevel PreTokenizer 설정 완료.")
 
     # 3. 트레이너 설정
     special_tokens = original_tokenizer.all_special_tokens
-    # 원본 토크나이저의 unk_token 사용 (GPT-2는 <|endoftext|>가 unk 역할)
     unk_token = original_tokenizer.unk_token or original_tokenizer.eos_token
     assert isinstance(unk_token, str)
     if unk_token not in special_tokens:
@@ -145,7 +151,6 @@ def distill_unigram_tokenizer(
 
     # 4. 코퍼스를 사용하여 토크나이저 학습
     logger.info("📚 코퍼스 디렉토리 '%s'에서 토크나이저 학습을 시작합니다.", corpus_dir)
-    # 배치 크기를 크게 하여 I/O 오버헤드 감소
     tokenizer.train_from_iterator(
         get_training_corpus(corpus_dir, batch_size=10000), trainer=trainer
     )

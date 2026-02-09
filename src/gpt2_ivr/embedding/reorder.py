@@ -1,4 +1,9 @@
-"""remap 규칙 기준 임베딩 재정렬 로직"""
+"""remap 규칙 기준 임베딩 재정렬 로직.
+
+재할당 규칙에 따라 원본 임베딩을 재정렬하여 재할당 토크나이저의
+어휘 순서와 일치시킨다. 기존 토큰의 임베딩은 보존하고,
+재할당된 토큰은 원본 위치의 임베딩을 새 위치로 복사한다.
+"""
 
 from __future__ import annotations
 
@@ -10,8 +15,6 @@ import torch
 import yaml
 from tokenizers import Tokenizer
 
-from gpt2_ivr.utils.logging_config import get_logger
-
 
 def reorder_embeddings(
     original_wte_path: Path,
@@ -21,8 +24,7 @@ def reorder_embeddings(
     output_dir: Path,
     logger: logging.Logger | None = None,
 ) -> dict[str, Path]:
-    """
-    Remap 규칙에 따라 토큰 임베딩을 재정렬한다.
+    """Remap 규칙에 따라 토큰 임베딩을 재정렬한다.
 
     Args:
         original_wte_path: 원본 토큰 임베딩 파일 경로
@@ -36,7 +38,7 @@ def reorder_embeddings(
         저장된 파일 경로를 담은 딕셔너리
     """
     if logger is None:
-        logger = get_logger("gpt2_ivr.embedding.reorder")
+        logger = logging.getLogger("gpt2_ivr.embedding.reorder")
 
     logger.info("🔄 임베딩 재정렬 시작")
 
@@ -81,7 +83,7 @@ def reorder_embeddings(
     else:
         logger.info("⚠️ Vocab 크기 증가: %d -> %d", vocab_size, new_vocab_size)
 
-    # 5. 먼저 기존 토큰들의 임베딩을 복사 (remap되지 않은 토큰 보존)
+    # 5. 기존 토큰들의 임베딩을 복사 (remap되지 않은 토큰 보존)
     original_vocab = original_tokenizer.get_vocab()
     remapped_vocab = remapped_tokenizer.get_vocab()
     preserved_count = 0
@@ -89,7 +91,6 @@ def reorder_embeddings(
     for token, old_id in original_vocab.items():
         new_id = remapped_vocab.get(token)
         if new_id is not None and token not in remap_rules.values():
-            # remap의 target이 아닌 토큰은 그대로 보존
             aligned_wte[new_id] = original_wte[old_id].clone()
             preserved_count += 1
 
@@ -102,7 +103,6 @@ def reorder_embeddings(
         new_id = remapped_tokenizer.token_to_id(new_token)
 
         if old_id is not None and new_id is not None:
-            # 원본 토큰의 임베딩을 새 토큰 위치로 복사
             aligned_wte[new_id] = original_wte[old_id].clone()
             remap_count += 1
             logger.debug(

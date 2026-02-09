@@ -1,13 +1,22 @@
+"""GPT2-IVR CLI 진입점 모듈.
+
+Tokenizer Model Migration + IVR 파이프라인의 명령줄 인터페이스를 제공한다.
+Rich 기반 콘솔 출력 및 로깅을 지원한다.
+"""
+
 from __future__ import annotations
 
 import argparse
 import logging
-from collections.abc import Callable
+
+from datetime import datetime
 from pathlib import Path
 from time import perf_counter
 from typing import Any
 
 from pyfiglet import Figlet
+from rich.console import Console
+from rich.logging import RichHandler
 from rich.panel import Panel
 from rich.table import Table
 from rich.text import Text
@@ -32,28 +41,43 @@ from gpt2_ivr.constants import (
     TOKENIZER_ORIGINAL_DIR,
     TOKENIZER_REMAPPED_DIR,
     TOKEN_FREQUENCY_FILE,
+    LOGS_DIR,
 )
-from gpt2_ivr.utils.logging_config import get_console, get_logger, setup_logging
 
 LOGGER_NAME = "gpt2_ivr.cli"
 REMAP_RULES_PATH = Path("src/gpt2_ivr/tokenizer/remap_rules.yaml")
+
+_CONSOLE = Console(stderr=False)
 
 
 class CliHelpFormatter(
     argparse.ArgumentDefaultsHelpFormatter, argparse.RawTextHelpFormatter
 ):
-    """CLI 도움말 포맷터."""
+    """CLI 도움말 포맷터.
+
+    ArgumentDefaultsHelpFormatter와 RawTextHelpFormatter를 결합하여
+    기본값 표시와 원시 텍스트 포맷을 동시에 지원한다.
+    """
 
 
 class CliArgumentParser(argparse.ArgumentParser):
-    """오류 메시지를 Rich 스타일로 출력하는 argparse 파서."""
+    """오류 메시지를 Rich 스타일로 출력하는 argparse 파서.
+
+    인자 파싱 오류 발생 시 Rich Panel로 오류를 표시하여
+    사용자 경험을 개선한다.
+    """
 
     def error(self, message: str) -> None:
-        console = get_console()
+        """인자 파싱 오류를 Rich 패널로 출력한다.
+
+        Args:
+            message: 오류 메시지
+        """
+        console = _CONSOLE
         console.print(
             Panel.fit(
                 f"[bold red]인자 오류[/bold red]\n{message}\n\n"
-                "[dim]도움말: uv run ivr --help[/dim]",
+                f"[dim]도움말: uv run ivr --help[/dim]",
                 title="CLI 입력 오류",
                 border_style="red",
             )
@@ -62,7 +86,17 @@ class CliArgumentParser(argparse.ArgumentParser):
 
 
 def non_negative_int(value: str) -> int:
-    """0 이상의 정수 인자를 파싱한다."""
+    """0 이상의 정수 인자를 파싱한다.
+
+    Args:
+        value: 파싱할 문자열 값
+
+    Returns:
+        파싱된 0 이상의 정수 값
+
+    Raises:
+        argparse.ArgumentTypeError: 값이 정수가 아니거나 0보다 작은 경우
+    """
     try:
         parsed = int(value)
     except ValueError as e:
@@ -74,7 +108,17 @@ def non_negative_int(value: str) -> int:
 
 
 def positive_int(value: str) -> int:
-    """1 이상의 정수 인자를 파싱한다."""
+    """1 이상의 정수 인자를 파싱한다.
+
+    Args:
+        value: 파싱할 문자열 값
+
+    Returns:
+        파싱된 1 이상의 정수 값
+
+    Raises:
+        argparse.ArgumentTypeError: 값이 정수가 아니거나 0 이하인 경우
+    """
     try:
         parsed = int(value)
     except ValueError as e:
@@ -85,14 +129,16 @@ def positive_int(value: str) -> int:
     return parsed
 
 
-def build_banner(text: str, font: str = "standard") -> str:
-    """배너 문자열을 생성한다."""
-    figlet = Figlet(font=font)
-    return figlet.renderText(text)
+def main() -> int:
+    """CLI 엔트리 포인트.
 
+    파이프라인 명령어를 파싱하고 실행한다. 각 단계별 명령어는
+    서브커맨드로 제공되며, Rich 기반 콘솔 출력과 파일 로깅을 지원한다.
 
-def build_parser() -> argparse.ArgumentParser:
-    """IVR CLI 파서를 생성한다."""
+    Returns:
+        종료 코드 (0: 성공, 1: 오류, 130: 사용자 중단)
+    """
+    # 1. CLI 파서와 서브커맨드를 정의한다.
     parser = CliArgumentParser(
         prog="ivr",
         description="Tokenizer Model Migration + IVR 파이프라인 CLI",
@@ -104,22 +150,9 @@ def build_parser() -> argparse.ArgumentParser:
         default="INFO",
         help="콘솔 로깅 레벨",
     )
-    parser.add_argument(
-        "--no-log-file",
-        action="store_true",
-        default=False,
-        help="artifacts/logs 파일 로그 기록 비활성화",
-    )
-    parser.add_argument(
-        "--no-banner",
-        action="store_true",
-        default=False,
-        help="시작 ASCII 배너 출력 비활성화",
-    )
 
     subparsers = parser.add_subparsers(dest="command", required=True, metavar="command")
 
-    # init 서브커맨드
     init_parser = subparsers.add_parser(
         "init",
         help="모델 및 토크나이저 초기화",
@@ -143,7 +176,6 @@ def build_parser() -> argparse.ArgumentParser:
         help="기존 파일이 있어도 다시 다운로드",
     )
 
-    # analyze 서브커맨드
     analyze_parser = subparsers.add_parser(
         "analyze",
         help="BPE 토큰 시퀀스 분석",
@@ -202,7 +234,6 @@ def build_parser() -> argparse.ArgumentParser:
         help="입력 파일 인코딩",
     )
 
-    # distill-tokenizer 서브커맨드
     distill_parser = subparsers.add_parser(
         "distill-tokenizer",
         help="BPE -> Unigram distillation",
@@ -227,7 +258,6 @@ def build_parser() -> argparse.ArgumentParser:
         help="학습 코퍼스 디렉토리",
     )
 
-    # select 서브커맨드
     select_parser = subparsers.add_parser(
         "select",
         help="IVR 대상 토큰 선정",
@@ -276,7 +306,6 @@ def build_parser() -> argparse.ArgumentParser:
         help="보호 토큰 최소 길이",
     )
 
-    # remap 서브커맨드
     remap_parser = subparsers.add_parser(
         "remap",
         help="토큰 재할당 규칙 적용",
@@ -307,7 +336,6 @@ def build_parser() -> argparse.ArgumentParser:
         help="교체 후보 CSV 경로",
     )
 
-    # align 서브커맨드
     align_parser = subparsers.add_parser(
         "align",
         help="임베딩 재정렬",
@@ -349,240 +377,201 @@ def build_parser() -> argparse.ArgumentParser:
         help="신규 토큰 임베딩 초기화 전략",
     )
 
-    # train 서브커맨드 (현재 stub)
     subparsers.add_parser(
         "train",
         help="미세조정",
         formatter_class=CliHelpFormatter,
     )
 
-    return parser
+    args = parser.parse_args()
 
+    # 2. 로깅 설정
+    log_level = getattr(logging, args.log_level.upper(), logging.INFO)
 
-def format_result_value(value: Any) -> str:
-    """결과 값 출력 문자열을 정규화한다."""
-    if isinstance(value, Path):
-        return str(value)
-    if isinstance(value, dict):
-        return f"dict({len(value)})"
-    if isinstance(value, list):
-        return f"list({len(value)})"
+    root_logger = logging.getLogger()
 
-    rendered = str(value)
-    if len(rendered) > 120:
-        return f"{rendered[:117]}..."
-    return rendered
+    root_logger.setLevel(log_level)
 
+    # 2.2. Rich 콘솔 핸들러를 등록한다.
+    console_handler = RichHandler(
+        rich_tracebacks=True, markup=True, console=_CONSOLE, show_time=False
+    )
+    console_handler.setFormatter(logging.Formatter("%(message)s"))
+    root_logger.addHandler(console_handler)
 
-def render_intro(command_name: str, show_banner: bool) -> None:
-    """실행 시작 정보를 출력한다."""
-    console = get_console()
-    title = "Tokenizer Model Migration + IVR"
-    subtitle = f"실행 명령어: {command_name}"
+    # 2.3. 파일 핸들러를 등록하여 전체 로그를 기록한다.
+    log_dir = LOGS_DIR
+    log_dir.mkdir(parents=True, exist_ok=True)
 
-    if show_banner:
-        banner = build_banner("GPT2-IVR").rstrip()
-        console.print(
-            Panel.fit(
-                Text(banner, style="bold cyan"),
-                title=title,
-                subtitle=subtitle,
-                border_style="cyan",
-            )
+    timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
+    log_file = log_dir / f"ivr_{timestamp}.log"
+
+    file_handler = logging.FileHandler(log_file, encoding="utf-8")
+    file_handler.setFormatter(
+        logging.Formatter(
+            "%(asctime)s [%(levelname)s] [%(filename)s:%(lineno)d] %(message)s"
         )
-        return
+    )
+    root_logger.addHandler(file_handler)
 
+    # 2.4. 로그 파일 위치를 안내한다.
+    root_logger.info("📝 로그 파일: %s", log_file)
+
+    logger = logging.getLogger(LOGGER_NAME)
+
+    # 3. 인트로 배너를 출력한다.
+    console = _CONSOLE
+    title = "Tokenizer Model Migration + IVR"
+    subtitle = f"실행 명령어: {args.command}"
+
+    figlet = Figlet(font="standard")
+    banner = figlet.renderText("GPT2-IVR").rstrip()
     console.print(
         Panel.fit(
-            f"[bold cyan]{title}[/bold cyan]\n{subtitle}",
+            Text(banner, style="bold cyan"),
+            title=title,
+            subtitle=subtitle,
             border_style="cyan",
         )
     )
 
-
-def render_result_summary(
-    command_name: str,
-    result: dict[str, Any],
-    elapsed_seconds: float,
-) -> None:
-    """커맨드 실행 결과를 테이블로 출력한다."""
-    table = Table(
-        title=f"✅ {command_name} 단계 완료",
-        show_header=False,
-        border_style="green",
-    )
-    table.add_column("항목", style="bold")
-    table.add_column("값")
-    table.add_row("실행 시간", f"{elapsed_seconds:.2f}초")
-
-    for key, value in result.items():
-        table.add_row(str(key), format_result_value(value))
-
-    get_console().print(table)
-
-
-def render_error_panel(
-    command_name: str,
-    error: Exception,
-    elapsed_seconds: float,
-) -> None:
-    """실행 오류를 패널로 출력한다."""
-    get_console().print(
-        Panel.fit(
-            f"[bold red]{command_name} 단계 실행 실패[/bold red]\n"
-            f"{type(error).__name__}: {error}\n"
-            f"[dim]경과 시간: {elapsed_seconds:.2f}초[/dim]",
-            title="실행 오류",
-            border_style="red",
-        )
-    )
-
-
-def _create_init_command(args: argparse.Namespace) -> InitCommand:
-    """init 커맨드를 생성한다."""
-    return InitCommand(
-        model_name=args.model_name,
-        tokenizer_dir=args.tokenizer_dir,
-        force=args.force,
-    )
-
-
-def _create_analyze_command(args: argparse.Namespace) -> AnalyzeCommand:
-    """analyze 커맨드를 생성한다."""
-    return AnalyzeCommand(
-        input_dir=args.input_dir,
-        output_sequences=args.output_sequences,
-        output_frequency=args.output_frequency,
-        tokenizer_dir=args.tokenizer_dir,
-        workers=args.workers,
-        chunk_size=args.chunk_size,
-        max_texts=args.max_texts,
-        text_key=args.text_key,
-        encoding=args.encoding,
-    )
-
-
-def _create_distill_command(args: argparse.Namespace) -> DistillCommand:
-    """distill-tokenizer 커맨드를 생성한다."""
-    return DistillCommand(
-        original_tokenizer_dir=args.original_tokenizer_dir,
-        distilled_tokenizer_dir=args.distilled_tokenizer_dir,
-        corpus_dir=args.corpus_dir,
-    )
-
-
-def _create_select_command(args: argparse.Namespace) -> SelectCommand:
-    """select 커맨드를 생성한다."""
-    return SelectCommand(
-        frequency_path=args.frequency_path,
-        sequences_path=args.sequences_path,
-        output_csv=args.output_csv,
-        output_log=args.output_log,
-        tokenizer_dir=args.tokenizer_dir,
-        max_candidates=args.max_candidates,
-        min_token_len=args.min_token_len,
-    )
-
-
-def _create_remap_command(args: argparse.Namespace) -> RemapCommand:
-    """remap 커맨드를 생성한다."""
-    return RemapCommand(
-        distilled_tokenizer_dir=args.distilled_tokenizer_dir,
-        remapped_tokenizer_dir=args.remapped_tokenizer_dir,
-        remap_rules_path=args.remap_rules_path,
-        replacement_candidates_path=args.replacement_candidates_path,
-    )
-
-
-def _create_align_command(args: argparse.Namespace) -> AlignCommand:
-    """align 커맨드를 생성한다."""
-    return AlignCommand(
-        model_name=args.model_name,
-        original_tokenizer_dir=args.original_tokenizer_dir,
-        remapped_tokenizer_dir=args.remapped_tokenizer_dir,
-        remap_rules_path=args.remap_rules_path,
-        embeddings_output_dir=args.embeddings_output_dir,
-        init_strategy=args.init_strategy,
-    )
-
-
-def _create_train_command(args: argparse.Namespace) -> TrainCommand:
-    """train 커맨드를 생성한다. (현재 stub)"""
-    # TODO: train 커맨드에 CLI 옵션이 추가되면 args를 사용하여 파라미터 전달
-    return TrainCommand()
-
-
-# 서브커맨드 팩토리 매핑
-CommandFactory = Callable[[argparse.Namespace], Command]
-
-COMMAND_FACTORY_MAP: dict[str, CommandFactory] = {
-    "init": _create_init_command,
-    "analyze": _create_analyze_command,
-    "distill-tokenizer": _create_distill_command,
-    "select": _create_select_command,
-    "remap": _create_remap_command,
-    "align": _create_align_command,
-    "train": _create_train_command,
-}
-
-
-def create_command(command_name: str, args: argparse.Namespace) -> Command:
-    """커맨드 이름에 해당하는 Command 객체를 생성한다."""
-    factory = COMMAND_FACTORY_MAP.get(command_name)
-    if factory is not None:
-        return factory(args)
-
-    raise NotImplementedError(f"'{command_name}'는 유효하지 않은 커맨드입니다.")
-
-
-def dispatch(
-    command_name: str, args: argparse.Namespace, logger: logging.Logger
-) -> int:
-    """서브커맨드를 실행한다."""
+    # 4. 명령어를 해석하고 실행한다.
     start = perf_counter()
 
     try:
-        command = create_command(command_name, args)
+        command_name = args.command
+        if command_name == "init":
+            command = InitCommand(
+                model_name=args.model_name,
+                tokenizer_dir=args.tokenizer_dir,
+                force=args.force,
+            )
+        elif command_name == "analyze":
+            command = AnalyzeCommand(
+                input_dir=args.input_dir,
+                output_sequences=args.output_sequences,
+                output_frequency=args.output_frequency,
+                tokenizer_dir=args.tokenizer_dir,
+                workers=args.workers,
+                chunk_size=args.chunk_size,
+                max_texts=args.max_texts,
+                text_key=args.text_key,
+                encoding=args.encoding,
+            )
+        elif command_name == "distill-tokenizer":
+            command = DistillCommand(
+                original_tokenizer_dir=args.original_tokenizer_dir,
+                distilled_tokenizer_dir=args.distilled_tokenizer_dir,
+                corpus_dir=args.corpus_dir,
+            )
+        elif command_name == "select":
+            command = SelectCommand(
+                frequency_path=args.frequency_path,
+                sequences_path=args.sequences_path,
+                output_csv=args.output_csv,
+                output_log=args.output_log,
+                tokenizer_dir=args.tokenizer_dir,
+                max_candidates=args.max_candidates,
+                min_token_len=args.min_token_len,
+            )
+        elif command_name == "remap":
+            command = RemapCommand(
+                distilled_tokenizer_dir=args.distilled_tokenizer_dir,
+                remapped_tokenizer_dir=args.remapped_tokenizer_dir,
+                remap_rules_path=args.remap_rules_path,
+                replacement_candidates_path=args.replacement_candidates_path,
+            )
+        elif command_name == "align":
+            command = AlignCommand(
+                model_name=args.model_name,
+                original_tokenizer_dir=args.original_tokenizer_dir,
+                remapped_tokenizer_dir=args.remapped_tokenizer_dir,
+                remap_rules_path=args.remap_rules_path,
+                embeddings_output_dir=args.embeddings_output_dir,
+                init_strategy=args.init_strategy,
+            )
+        elif command_name == "train":
+            command = TrainCommand()
+        else:
+            raise NotImplementedError(f"'{command_name}'는 유효하지 않은 커맨드입니다.")
+
         resolved_name = command.get_name()
         logger.info("🚀 [%s] 단계를 시작합니다.", resolved_name)
         result = command.execute()
         elapsed = perf_counter() - start
         logger.info("✅ [%s] 단계가 완료되었습니다. (%.2fs)", resolved_name, elapsed)
-        render_result_summary(resolved_name, result, elapsed)
+        table = Table(
+            title=f"✅ {resolved_name} 단계 완료",
+            show_header=False,
+            border_style="green",
+        )
+        table.add_column("항목", style="bold")
+        table.add_column("값")
+        table.add_row("실행 시간", f"{elapsed:.2f}초")
+
+        # 4.1. 실행 결과를 테이블로 정리하여 출력한다.
+        for key, value in result.items():
+            _value_to_format = value
+            if isinstance(_value_to_format, Path):
+                formatted_value = str(_value_to_format)
+            elif isinstance(_value_to_format, dict):
+                formatted_value = f"dict({len(_value_to_format)})"
+            elif isinstance(_value_to_format, list):
+                formatted_value = f"list({len(_value_to_format)})"
+            else:
+                formatted_value = str(_value_to_format)
+
+            if len(formatted_value) > 120:
+                formatted_value = f"{formatted_value[:117]}..."
+            table.add_row(str(key), formatted_value)
+
+        _CONSOLE.print(table)
         return 0
     except NotImplementedError as e:
         elapsed = perf_counter() - start
-        logger.error("[%s] 미구현/미지원 오류: %s", command_name, e)
-        render_error_panel(command_name, e, elapsed)
+        logger.error("[%s] 미구현/미지원 오류: %s", args.command, e)
+        # 4.2. 오류 상황을 Rich 패널로 안내한다.
+        _CONSOLE.print(
+            Panel.fit(
+                f"[bold red]{args.command} 단계 실행 실패[/bold red]\n"
+                f"{type(e).__name__}: {e}\n"
+                f"[dim]경과 시간: {elapsed:.2f}초[/dim]",
+                title="실행 오류",
+                border_style="red",
+            )
+        )
         return 1
     except (FileNotFoundError, ValueError) as e:
         elapsed = perf_counter() - start
-        logger.error("[%s] 입력 검증 오류: %s", command_name, e)
-        render_error_panel(command_name, e, elapsed)
+        logger.error("[%s] 입력 검증 오류: %s", args.command, e)
+        # 4.3. 오류 상황을 Rich 패널로 안내한다.
+        _CONSOLE.print(
+            Panel.fit(
+                f"[bold red]{args.command} 단계 실행 실패[/bold red]\n"
+                f"{type(e).__name__}: {e}\n"
+                f"[dim]경과 시간: {elapsed:.2f}초[/dim]",
+                title="실행 오류",
+                border_style="red",
+            )
+        )
         return 1
     except KeyboardInterrupt:
         logger.warning("⏹️ 사용자 요청으로 실행이 중단되었습니다.")
         return 130
     except Exception as e:
         elapsed = perf_counter() - start
-        logger.exception("[%s] 실행 중 예기치 않은 오류가 발생했습니다.", command_name)
-        render_error_panel(command_name, e, elapsed)
+        logger.exception("[%s] 실행 중 예기치 않은 오류가 발생했습니다.", args.command)
+        # 4.4. 오류 상황을 Rich 패널로 안내한다.
+        _CONSOLE.print(
+            Panel.fit(
+                f"[bold red]{args.command} 단계 실행 실패[/bold red]\n"
+                f"{type(e).__name__}: {e}\n"
+                f"[dim]경과 시간: {elapsed:.2f}초[/dim]",
+                title="실행 오류",
+                border_style="red",
+            )
+        )
         return 1
-
-
-def main() -> int:
-    """CLI 엔트리 포인트."""
-    parser = build_parser()
-    args = parser.parse_args()
-
-    log_level = getattr(logging, args.log_level.upper(), logging.INFO)
-    setup_logging(level=log_level, log_to_file=not args.no_log_file)
-    logger = get_logger(LOGGER_NAME)
-
-    render_intro(args.command, show_banner=not args.no_banner)
-    logger.info("Tokenizer Model Migration + IVR 파이프라인")
-    logger.info("BPE -> Unigram 토크나이저 교체 후 IVR를 수행합니다.")
-    return dispatch(args.command, args, logger)
 
 
 if __name__ == "__main__":

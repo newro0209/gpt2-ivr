@@ -1,4 +1,11 @@
-"""신규 토큰 임베딩 초기화 로직"""
+"""신규 토큰 임베딩 초기화 로직.
+
+재할당 과정에서 새로 추가된 토큰의 임베딩을 초기화한다.
+세 가지 전략을 지원한다:
+- mean: 기존 토큰 임베딩의 평균으로 초기화
+- random: 기존 토큰 임베딩의 표준편차를 사용한 정규분포에서 샘플링
+- zeros: 0으로 유지
+"""
 
 from __future__ import annotations
 
@@ -10,8 +17,6 @@ import torch
 import yaml
 from tokenizers import Tokenizer
 
-from gpt2_ivr.utils.logging_config import get_logger
-
 
 def initialize_new_token_embeddings(
     aligned_wte_path: Path,
@@ -22,8 +27,7 @@ def initialize_new_token_embeddings(
     init_strategy: str = "mean",
     logger: logging.Logger | None = None,
 ) -> dict[str, Path]:
-    """
-    신규 추가된 토큰에 대한 임베딩을 초기화한다.
+    """신규 추가된 토큰에 대한 임베딩을 초기화한다.
 
     Args:
         aligned_wte_path: 재정렬된 토큰 임베딩 파일 경로
@@ -38,7 +42,7 @@ def initialize_new_token_embeddings(
         저장된 파일 경로를 담은 딕셔너리
     """
     if logger is None:
-        logger = get_logger("gpt2_ivr.embedding.init_new")
+        logger = logging.getLogger("gpt2_ivr.embedding.init_new")
 
     logger.info("🆕 신규 토큰 임베딩 초기화 시작")
     logger.info("초기화 전략: %s", init_strategy)
@@ -65,28 +69,27 @@ def initialize_new_token_embeddings(
     with open(remap_rules_path, "r", encoding="utf-8") as f:
         remap_rules = yaml.safe_load(f) or {}
 
-    # 4. 신규 토큰 찾기 (remapped에는 있지만 original에는 없는 토큰)
+    # 4. 신규 토큰 탐색 (remapped vocab에 있지만 original vocab에는 없는 토큰)
+    # 1) original에 있던 토큰은 제외
+    # 2) remap target이지만 source가 original에 있던 경우도 제외 (재할당이므로 신규 아님)
+    # 3) 임베딩이 0으로 초기화된 경우만 신규로 판단
     new_tokens = []
     remapped_vocab = remapped_tokenizer.get_vocab()
 
     for token, token_id in remapped_vocab.items():
-        # 먼저 original 토크나이저에 있는지 확인
         if original_tokenizer.token_to_id(token) is not None:
-            continue  # 원래 있던 토큰이면 스킵
+            continue
 
-        # remap rules에서 이 토큰이 target으로 사용되는지 확인
         is_remapped_target = token in remap_rules.values()
         if is_remapped_target:
-            # 이 토큰이 remap의 결과라면, source 토큰이 original에 있었는지 확인
             source_existed = any(
                 original_tokenizer.token_to_id(old_token) is not None
                 for old_token, new_token in remap_rules.items()
                 if new_token == token
             )
             if source_existed:
-                continue  # source가 있었다면 재할당이므로 신규 아님
+                continue
 
-        # token_id가 범위 내이고 임베딩이 초기화되지 않았는지 확인
         if token_id < vocab_size and torch.all(aligned_wte[token_id] == 0):
             new_tokens.append((token, token_id))
 
@@ -94,12 +97,10 @@ def initialize_new_token_embeddings(
 
     # 5. 초기화 전략에 따라 임베딩 초기화
     if len(new_tokens) > 0:
-        # 0이 아닌 임베딩 마스크 계산 (mean/random 전략에서 공통 사용)
         non_zero_mask = ~torch.all(aligned_wte == 0, dim=1)
         has_non_zero = non_zero_mask.sum() > 0
 
         if init_strategy == "mean":
-            # 기존 임베딩들의 평균으로 초기화
             if has_non_zero:
                 mean_embedding = aligned_wte[non_zero_mask].mean(dim=0)
             else:
@@ -112,11 +113,10 @@ def initialize_new_token_embeddings(
                 )
 
         elif init_strategy == "random":
-            # 정규분포로부터 랜덤 초기화
             if has_non_zero:
                 std = aligned_wte[non_zero_mask].std().item()
             else:
-                std = 0.02  # 기본 표준편차 (GPT-2 초기화 값)
+                std = 0.02
 
             for token, token_id in new_tokens:
                 aligned_wte[token_id] = torch.randn(embedding_dim) * std
@@ -128,7 +128,6 @@ def initialize_new_token_embeddings(
                 )
 
         elif init_strategy == "zeros":
-            # 이미 0으로 초기화되어 있으므로 아무것도 하지 않음
             logger.info("zeros 전략 선택 - 기존 zero 임베딩 유지")
 
         else:

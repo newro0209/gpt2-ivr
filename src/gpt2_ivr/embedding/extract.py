@@ -1,4 +1,8 @@
-"""기존 모델 임베딩 추출 로직"""
+"""기존 모델 임베딩 추출 로직.
+
+GPT-2 모델에서 토큰 임베딩(wte)과 위치 임베딩(wpe)을 추출하여
+PyTorch 텐서 파일로 저장한다. 메타데이터도 JSON 형식으로 함께 저장한다.
+"""
 
 from __future__ import annotations
 
@@ -9,16 +13,13 @@ from pathlib import Path
 import torch
 from transformers import GPT2LMHeadModel
 
-from gpt2_ivr.utils.logging_config import get_logger
-
 
 def extract_embeddings(
     model_name: str,
     output_dir: Path,
     logger: logging.Logger | None = None,
 ) -> dict[str, Path]:
-    """
-    GPT-2 모델에서 토큰 임베딩(wte)과 위치 임베딩(wpe)을 추출하여 저장한다.
+    """GPT-2 모델에서 토큰 임베딩(wte)과 위치 임베딩(wpe)을 추출하여 저장한다.
 
     Args:
         model_name: Hugging Face Hub 모델 이름
@@ -29,7 +30,7 @@ def extract_embeddings(
         저장된 임베딩 파일 경로를 담은 딕셔너리
     """
     if logger is None:
-        logger = get_logger("gpt2_ivr.embedding.extract")
+        logger = logging.getLogger("gpt2_ivr.embedding.extract")
 
     logger.info("🔍 모델 로딩 중: %s", model_name)
     model = GPT2LMHeadModel.from_pretrained(model_name, local_files_only=True)

@@ -1,19 +1,28 @@
-"""모델 및 토크나이저 초기화 (다운로드) 모듈"""
+"""모델 및 토크나이저 초기화 (다운로드) 모듈.
+
+Hugging Face Hub에서 GPT-2 모델의 토크나이저와 설정 파일을 다운로드하여
+로컬에 저장한다. 이미 파일이 존재하는 경우 중복 다운로드를 방지한다.
+"""
 
 from __future__ import annotations
 
+import logging
 from pathlib import Path
 from typing import TypedDict
 
 from transformers import AutoConfig, AutoTokenizer, PreTrainedTokenizerBase
 
-from gpt2_ivr.utils.logging_config import get_logger
-
-logger = get_logger(__name__)
+logger = logging.getLogger(__name__)
 
 
 class InitResult(TypedDict):
-    """초기화 결과 타입"""
+    """초기화 결과 타입.
+
+    Attributes:
+        tokenizer_dir: 토크나이저가 저장된 디렉토리
+        vocab_size: 어휘 크기
+        model_name: Hugging Face Hub 모델 이름
+    """
 
     tokenizer_dir: Path
     vocab_size: int

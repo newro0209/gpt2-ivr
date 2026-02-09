@@ -92,7 +92,6 @@ gpt2-ivr/
         │   ├─ sft_config.yaml          # 미세조정 하이퍼파라미터/런타임 설정
         │   └─ train.py                 # accelerate 기반 학습 실행
         │
-        └─ utils/               # 공통 유틸리티
             ├─ __init__.py
             └─ logging_config.py
 ```
@@ -222,13 +221,9 @@ artifacts/analysis/reports/
   - 토큰 분석, 토크나이저 증류, 임베딩 처리, 모델 학습 등 핵심 기능
   - 연구 및 실험의 핵심 자산
 
-### 4️⃣ 유틸리티 계층 (Infrastructure/Utility Layer)
+### 횡단 관심사 처리
 
-- **위치**: `utils/`
-- **책임**: 공통 유틸리티 및 인프라 지원
-- **역할**:
-  - 로깅 설정 등 횡단 관심사(Cross-cutting Concerns) 처리
-  - 모든 계층에서 공통으로 사용하는 기능 제공
+로깅, 진행률 출력 같은 인프라/운영 관련 횡단 관심사는 별도 `utils/` 계층을 두지 않고 `src/gpt2_ivr/cli.py`에서 직접 구성 및 노출합니다. Rich 기반 콘솔 핸들러와 ASCII 배너, 테이블/패널 출력, 로그 파일 흐름을 CLI 측에서 설정하므로 별도의 위계 없이 `commands/`와 `analysis/` 등이 필요한 곳에 리소스를 제공합니다.
 
 ### 계층 간 의존성 규칙
 
@@ -238,8 +233,6 @@ artifacts/analysis/reports/
 애플리케이션 계층 (commands/)
         ↓
 도메인 계층 (analysis/, tokenizer/, embedding/, training/)
-        ↓
-유틸리티 계층 (utils/)
 ```
 
 - **단방향 의존성**: 상위 계층은 하위 계층에만 의존

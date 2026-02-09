@@ -1,6 +1,13 @@
+"""BPE 토큰 시퀀스 생성 모듈.
+
+코퍼스 파일에서 텍스트를 읽어 GPT-2 BPE 토크나이저로 토큰화하여
+토큰 ID 시퀀스를 생성한다. 병렬 처리를 통해 대용량 코퍼스를 효율적으로 처리한다.
+"""
+
 from __future__ import annotations
 
 import json
+import logging
 from concurrent.futures import ThreadPoolExecutor
 from itertools import islice
 from pathlib import Path
@@ -9,13 +16,22 @@ from typing import Iterable, Iterator, cast
 
 from transformers import BatchEncoding, GPT2Tokenizer
 
-from gpt2_ivr.utils.logging_config import create_progress, get_logger
-
-logger = get_logger(__name__)
+logger = logging.getLogger(__name__)
 
 
 def find_input_files(input_dir: Path, inputs: list[Path]) -> list[Path]:
-    """분석 대상 파일 목록을 수집한다."""
+    """분석 대상 파일 목록을 수집한다.
+
+    input_dir에서 재귀적으로 파일을 탐색하고, inputs 리스트의 파일을 추가한다.
+    .txt, .jsonl, .json 확장자만 허용한다.
+
+    Args:
+        input_dir: 재귀 탐색할 디렉토리
+        inputs: 추가로 포함할 파일 목록
+
+    Returns:
+        중복 제거된 정렬된 파일 경로 목록
+    """
     allowed_suffixes = {".txt", ".jsonl", ".json"}
     files: list[Path] = []
 
@@ -32,7 +48,18 @@ def find_input_files(input_dir: Path, inputs: list[Path]) -> list[Path]:
 
 
 def iter_texts(files: list[Path], text_key: str, encoding: str) -> Iterator[str]:
-    """파일 목록에서 텍스트를 순차 생성한다."""
+    """파일 목록에서 텍스트를 순차 생성한다.
+
+    .txt, .jsonl, .json 형식을 지원하며, 빈 줄은 자동으로 건너뛴다.
+
+    Args:
+        files: 읽을 파일 경로 목록
+        text_key: JSON 객체에서 텍스트를 추출할 키 이름
+        encoding: 파일 인코딩
+
+    Yields:
+        텍스트 문자열 (빈 줄 제외)
+    """
     for path in files:
         suffix = path.suffix.lower()
 
@@ -73,7 +100,15 @@ def iter_texts(files: list[Path], text_key: str, encoding: str) -> Iterator[str]
 
 
 def chunk_iter(source: Iterable[str], chunk_size: int) -> Iterator[list[str]]:
-    """텍스트 스트림을 고정 크기 청크로 분할한다."""
+    """텍스트 스트림을 고정 크기 청크로 분할한다.
+
+    Args:
+        source: 텍스트 iterable
+        chunk_size: 청크당 텍스트 개수
+
+    Yields:
+        chunk_size 크기의 텍스트 리스트
+    """
     iterator = iter(source)
     while True:
         chunk = list(islice(iterator, chunk_size))
@@ -82,20 +117,29 @@ def chunk_iter(source: Iterable[str], chunk_size: int) -> Iterator[list[str]]:
         yield chunk
 
 
-def export_bpe_token_sequences(
+def iter_bpe_token_sequences(
     texts: Iterable[str],
-    output_path: Path,
     tokenizer: GPT2Tokenizer,
     workers: int,
     chunk_size: int,
-) -> tuple[int, int]:
-    """텍스트를 GPT-2 BPE token id 시퀀스로 변환해 파일로 저장한다."""
+) -> Iterator[list[list[int]]]:
+    """텍스트를 GPT-2 BPE token id 시퀀스로 변환한다.
+
+    ThreadPoolExecutor를 사용하여 병렬 토큰화를 수행한다.
+    tokenizer 호출은 thread-safe하지 않을 수 있으므로 Lock으로 보호한다.
+
+    Args:
+        texts: 토큰화할 텍스트 iterable
+        tokenizer: GPT-2 토크나이저
+        workers: 스레드 워커 수
+        chunk_size: 청크당 텍스트 개수
+
+    Yields:
+        토큰 ID 시퀀스 리스트의 리스트
+    """
     encode_lock = Lock()
-    total_lines = 0
-    total_tokens = 0
 
     def encode_chunk(chunk: list[str]) -> list[list[int]]:
-        # 토크나이저 인스턴스의 스레드 안전성을 보호한다.
         with encode_lock:
             encoded: BatchEncoding = tokenizer(
                 chunk,
@@ -105,19 +149,5 @@ def export_bpe_token_sequences(
             )
         return cast(list[list[int]], encoded["input_ids"])
 
-    output_path.parent.mkdir(parents=True, exist_ok=True)
-    with output_path.open("w", encoding="utf-8") as handle:
-        with ThreadPoolExecutor(max_workers=workers) as executor:
-            with create_progress() as progress:
-                task_id = progress.add_task("BPE 토큰 시퀀스 생성", total=None)
-                for chunk_ids in executor.map(
-                    encode_chunk, chunk_iter(texts, chunk_size)
-                ):
-                    progress.advance(task_id)
-                    for token_ids in chunk_ids:
-                        handle.write(" ".join(str(token_id) for token_id in token_ids))
-                        handle.write("\n")
-                        total_lines += 1
-                        total_tokens += len(token_ids)
-
-    return total_lines, total_tokens
+    with ThreadPoolExecutor(max_workers=workers) as executor:
+        yield from executor.map(encode_chunk, chunk_iter(texts, chunk_size))

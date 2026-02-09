@@ -1,7 +1,12 @@
-"""임베딩 정렬 커맨드"""
+"""임베딩 정렬 커맨드.
+
+원본 모델에서 임베딩을 추출하고, 재할당 규칙에 따라 재정렬한 후
+신규 토큰의 임베딩을 초기화하는 3단계 프로세스를 수행한다.
+"""
 
 from __future__ import annotations
 
+import logging
 from pathlib import Path
 from typing import Any
 
@@ -11,11 +16,24 @@ from gpt2_ivr.embedding import (
     initialize_new_token_embeddings,
     reorder_embeddings,
 )
-from gpt2_ivr.utils.logging_config import get_logger
 
 
 class AlignCommand(Command):
-    """임베딩 추출, 재정렬 및 초기화를 수행한다."""
+    """임베딩 추출, 재정렬 및 초기화를 수행한다.
+
+    1단계: 원본 모델 임베딩 추출 (wte, wpe)
+    2단계: 재할당 규칙에 따라 임베딩 재정렬
+    3단계: 신규 토큰 임베딩 초기화 (mean, random, zeros)
+
+    Attributes:
+        logger: 로거 인스턴스
+        model_name: GPT-2 모델 이름
+        original_tokenizer_dir: 원본 토크나이저 디렉토리
+        remapped_tokenizer_dir: 재할당 토크나이저 디렉토리
+        remap_rules_path: 재할당 규칙 YAML 파일 경로
+        embeddings_output_dir: 임베딩 출력 디렉토리
+        init_strategy: 신규 토큰 임베딩 초기화 전략
+    """
 
     def __init__(
         self,
@@ -26,7 +44,7 @@ class AlignCommand(Command):
         embeddings_output_dir: Path,
         init_strategy: str,
     ) -> None:
-        self.logger = get_logger("gpt2_ivr.align")
+        self.logger = logging.getLogger("gpt2_ivr.align")
         self.model_name = model_name
         self.original_tokenizer_dir = original_tokenizer_dir
         self.remapped_tokenizer_dir = remapped_tokenizer_dir
@@ -35,7 +53,16 @@ class AlignCommand(Command):
         self.init_strategy = init_strategy
 
     def execute(self, **kwargs: Any) -> dict[str, Any]:
-        """커맨드 실행 로직"""
+        """임베딩 정렬을 실행한다.
+
+        임베딩 추출, 재정렬, 초기화의 3단계를 순차적으로 수행한다.
+
+        Args:
+            **kwargs: 사용되지 않음
+
+        Returns:
+            실행 결과 딕셔너리 (status, extract_result, reorder_result, init_result, embeddings_dir)
+        """
         self.logger.info("🚀 align 단계를 시작합니다.")
 
         # 1. 원본 모델에서 임베딩 추출
@@ -91,5 +118,9 @@ class AlignCommand(Command):
         }
 
     def get_name(self) -> str:
-        """커맨드 이름 반환"""
+        """커맨드 이름을 반환한다.
+
+        Returns:
+            커맨드 이름 "align"
+        """
         return "align"
