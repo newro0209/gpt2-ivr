@@ -34,8 +34,8 @@ class RemapCommand(Command):
 
         Note:
             - 상대 경로는 현재 작업 디렉토리(CWD) 기준으로 해석됩니다.
-            - CLI 실행 시 CWD는 일반적으로 프로젝트 루트 디렉토리입니다.
-            - CWD가 변경되면 상대 경로가 달라지므로, 안정성이 중요한 경우 절대 경로를 사용하세요.
+            - CWD는 CLI를 실행하는 디렉토리에 따라 달라집니다.
+            - 안정적이고 예측 가능한 동작을 위해 절대 경로 사용을 권장합니다.
         """
         self.logger = get_logger("gpt2_ivr.remap")
         self.distilled_tokenizer_path = Path(distilled_tokenizer_dir)
