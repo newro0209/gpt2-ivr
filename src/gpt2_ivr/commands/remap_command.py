@@ -27,14 +27,15 @@ class RemapCommand(Command):
         RemapCommand 초기화.
 
         Args:
-            distilled_tokenizer_dir: 증류된 토크나이저 디렉토리 (상대 경로는 CWD 기준)
-            remapped_tokenizer_dir: 재할당 토크나이저 디렉토리 (상대 경로는 CWD 기준)
-            remap_rules_path: 재할당 규칙 파일 경로 (상대 경로는 CWD 기준)
-            replacement_candidates_path: 교체 후보 CSV 경로 (상대 경로는 CWD 기준)
+            distilled_tokenizer_dir: 증류된 토크나이저 디렉토리 (절대 경로 또는 CWD 기준 상대 경로)
+            remapped_tokenizer_dir: 재할당 토크나이저 디렉토리 (절대 경로 또는 CWD 기준 상대 경로)
+            remap_rules_path: 재할당 규칙 파일 경로 (절대 경로 또는 CWD 기준 상대 경로)
+            replacement_candidates_path: 교체 후보 CSV 경로 (절대 경로 또는 CWD 기준 상대 경로)
 
         Note:
-            모든 경로는 현재 작업 디렉토리(CWD) 기준 상대 경로입니다.
+            상대 경로는 현재 작업 디렉토리(CWD) 기준으로 해석됩니다.
             CWD가 변경되면 경로가 달라질 수 있으므로 주의하세요.
+            절대 경로를 사용하면 CWD에 독립적입니다.
         """
         self.logger = get_logger("gpt2_ivr.remap")
         self.distilled_tokenizer_path = Path(distilled_tokenizer_dir)
