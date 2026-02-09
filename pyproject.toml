@@ -30,6 +30,10 @@ ivr = "gpt2_ivr.cli:main"
 [tool.setuptools.packages.find]
 where = ["src"]
 
+[tool.black]
+line-length = 120
+target-version = ["py313"]
+
 [tool.pyright]
 typeCheckingMode = "basic"
 
