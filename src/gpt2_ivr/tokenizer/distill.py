@@ -7,7 +7,7 @@ from pathlib import Path
 from typing import Iterator, TypedDict
 
 from tokenizers import Tokenizer, models, pre_tokenizers, trainers
-from transformers import AutoTokenizer, PreTrainedTokenizerFast
+from transformers import AutoTokenizer, PreTrainedTokenizerBase, PreTrainedTokenizerFast
 
 from gpt2_ivr.utils.logging_config import get_logger
 
@@ -67,16 +67,16 @@ def distill_unigram_tokenizer(
     original_tokenizer_dir: Path,
     distilled_tokenizer_dir: Path,
     corpus_dir: Path,
-    vocab_size: int,
     model_name: str,
 ) -> DistillResult:
     """GPT-2 BPE 토크나이저의 동작을 모방하는 Unigram 토크나이저를 distillation 방식으로 학습한다.
+
+    어휘 크기는 원본 토크나이저와 동일하게 맞춘다.
 
     Args:
         original_tokenizer_dir: 원본 토크나이저 디렉토리
         distilled_tokenizer_dir: 증류된 토크나이저 저장 디렉토리
         corpus_dir: 학습 코퍼스 디렉토리
-        vocab_size: 학습할 Unigram 토크나이저의 어휘 크기
         model_name: Hugging Face Hub에서 로드할 모델 이름
 
     Returns:
@@ -100,7 +100,7 @@ def distill_unigram_tokenizer(
         for f in tokenizer_files
     ):
         try:
-            original_tokenizer = AutoTokenizer.from_pretrained(
+            original_tokenizer: PreTrainedTokenizerBase = AutoTokenizer.from_pretrained(
                 str(original_tokenizer_dir)
             )
             logger.info(
@@ -112,7 +112,9 @@ def distill_unigram_tokenizer(
                 "원본 토크나이저 로드 실패(%s): %s", original_tokenizer_dir, e
             )
             logger.info("Hugging Face Hub에서 '%s'를 다운로드합니다.", model_name)
-            original_tokenizer = AutoTokenizer.from_pretrained(model_name)
+            original_tokenizer: PreTrainedTokenizerBase = AutoTokenizer.from_pretrained(
+                model_name
+            )
 
             # Hub에서 로드한 토크나이저를 original 디렉토리에 저장
             original_tokenizer_dir.mkdir(parents=True, exist_ok=True)
@@ -127,7 +129,9 @@ def distill_unigram_tokenizer(
             "원본 토크나이저 디렉토리가 비어있습니다. Hugging Face Hub에서 '%s'를 다운로드합니다.",
             model_name,
         )
-        original_tokenizer = AutoTokenizer.from_pretrained(model_name)
+        original_tokenizer: PreTrainedTokenizerBase = AutoTokenizer.from_pretrained(
+            model_name
+        )
 
         # Hub에서 로드한 토크나이저를 original 디렉토리에 저장
         original_tokenizer_dir.mkdir(parents=True, exist_ok=True)
@@ -139,6 +143,7 @@ def distill_unigram_tokenizer(
         )
 
     original_vocab_size = len(original_tokenizer.get_vocab())
+    vocab_size = original_vocab_size
 
     # 2. Unigram 토크나이저 초기화
     tokenizer = Tokenizer(models.Unigram())

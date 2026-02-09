@@ -135,12 +135,6 @@ def build_parser() -> argparse.ArgumentParser:
         help="학습 코퍼스 디렉토리",
     )
     distill_parser.add_argument(
-        "--vocab-size",
-        type=int,
-        default=50257,
-        help="어휘 크기",
-    )
-    distill_parser.add_argument(
         "--model-name",
         default="openai-community/gpt2",
         help="모델 이름",
@@ -285,7 +279,6 @@ def _create_distill_command(args: argparse.Namespace) -> DistillCommand:
         original_tokenizer_dir=Path(args.original_tokenizer_dir),
         distilled_tokenizer_dir=Path(args.distilled_tokenizer_dir),
         corpus_dir=Path(args.corpus_dir),
-        vocab_size=args.vocab_size,
         model_name=args.model_name,
     )
 

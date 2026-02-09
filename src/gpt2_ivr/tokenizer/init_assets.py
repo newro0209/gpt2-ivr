@@ -5,7 +5,7 @@ from __future__ import annotations
 from pathlib import Path
 from typing import TypedDict
 
-from transformers import AutoTokenizer, AutoConfig
+from transformers import AutoConfig, AutoTokenizer, PreTrainedTokenizerBase
 
 from gpt2_ivr.utils.logging_config import get_logger
 
@@ -46,7 +46,9 @@ def initialize_assets(
 
     if has_tokenizer and not force:
         logger.info("✅ 토크나이저가 이미 존재합니다: %s", tokenizer_dir)
-        tokenizer = AutoTokenizer.from_pretrained(str(tokenizer_dir))
+        tokenizer: PreTrainedTokenizerBase = AutoTokenizer.from_pretrained(
+            str(tokenizer_dir)
+        )
         vocab_size = len(tokenizer.get_vocab())
         logger.info("  └─ vocab 크기: %d", vocab_size)
         return InitResult(
@@ -57,7 +59,7 @@ def initialize_assets(
 
     # Hub에서 토크나이저 다운로드
     logger.info("📥 Hugging Face Hub에서 토크나이저를 다운로드합니다: %s", model_name)
-    tokenizer = AutoTokenizer.from_pretrained(model_name)
+    tokenizer: PreTrainedTokenizerBase = AutoTokenizer.from_pretrained(model_name)
 
     tokenizer_dir.mkdir(parents=True, exist_ok=True)
     tokenizer.save_pretrained(str(tokenizer_dir))

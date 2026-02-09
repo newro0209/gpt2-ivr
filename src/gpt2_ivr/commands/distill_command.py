@@ -18,13 +18,11 @@ class DistillCommand(Command):
         original_tokenizer_dir: Path,
         distilled_tokenizer_dir: Path,
         corpus_dir: Path,
-        vocab_size: int,
         model_name: str,
     ):
         self.original_tokenizer_dir = original_tokenizer_dir
         self.distilled_tokenizer_dir = distilled_tokenizer_dir
         self.corpus_dir = corpus_dir
-        self.vocab_size = vocab_size
         self.model_name = model_name
 
     def execute(self, **kwargs: Any) -> dict[str, Any]:
@@ -33,7 +31,6 @@ class DistillCommand(Command):
             original_tokenizer_dir=self.original_tokenizer_dir,
             distilled_tokenizer_dir=self.distilled_tokenizer_dir,
             corpus_dir=self.corpus_dir,
-            vocab_size=self.vocab_size,
             model_name=self.model_name,
         )
 
