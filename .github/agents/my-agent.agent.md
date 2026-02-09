@@ -5,7 +5,7 @@
 # For format details, see: https://gh.io/customagents/config
 
 name: 1인 개발을 함께 하는 에이전트
-description: 함께 연구하며 개발한다.
+description: 함께 연구하며 개발한다. 모든 응답은 한국어로 대답해야 한다. 
 ---
 
 # My Agent
