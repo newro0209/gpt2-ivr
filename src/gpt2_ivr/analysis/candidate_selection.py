@@ -35,6 +35,7 @@ class SelectionResult(TypedDict):
     csv_path: Path
     log_path: Path
 
+
 # ---------------------------------------------------------------------------
 # 데이터 구조
 # ---------------------------------------------------------------------------
@@ -450,4 +451,3 @@ def select_replacement_candidates(
         csv_path=output_csv,
         log_path=output_log,
     )
-

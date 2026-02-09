@@ -1,4 +1,5 @@
 """Tokenizer Remapping Command"""
+
 from __future__ import annotations
 
 import logging
@@ -16,19 +17,20 @@ from gpt2_ivr.utils.logging_config import get_logger
 class RemapCommand(Command):
     """Remap Command"""
 
-    def __init__(self) -> None:
+    def __init__(
+        self,
+        distilled_tokenizer_dir: Path = Path("artifacts/tokenizers/distilled_unigram"),
+        remapped_tokenizer_dir: Path = Path("artifacts/tokenizers/remapped"),
+        remap_rules_path: Path = Path("src/gpt2_ivr/tokenizer/remap_rules.yaml"),
+        replacement_candidates_path: Path = Path(
+            "artifacts/analysis/reports/replacement_candidates.csv"
+        ),
+    ) -> None:
         self.logger = get_logger("gpt2_ivr.remap")
-        self.artifacts_dir = Path("artifacts")
-        self.distilled_tokenizer_path = (
-            self.artifacts_dir / "tokenizers" / "distilled_unigram"
-        )
-        self.remapped_tokenizer_path = (
-            self.artifacts_dir / "tokenizers" / "remapped"
-        )
-        self.remap_rules_path = Path("src/gpt2_ivr/tokenizer/remap_rules.yaml")
-        self.replacement_candidates_path = (
-            self.artifacts_dir / "analysis" / "reports" / "replacement_candidates.csv"
-        )
+        self.distilled_tokenizer_path = distilled_tokenizer_dir
+        self.remapped_tokenizer_path = remapped_tokenizer_dir
+        self.remap_rules_path = remap_rules_path
+        self.replacement_candidates_path = replacement_candidates_path
 
     def execute(self, **kwargs: Any) -> dict[str, Any]:
         """커맨드 실행 로직"""
@@ -69,7 +71,7 @@ class RemapCommand(Command):
         # 3. Load remap rules
         if not self.remap_rules_path.exists():
             self.logger.error(
-                "Remap rules file not found at %s. " "Cannot perform remapping.",
+                "Remap rules file not found at %s. Cannot perform remapping.",
                 self.remap_rules_path,
             )
             return {"status": "failed", "message": "Remap rules missing"}
@@ -77,10 +79,14 @@ class RemapCommand(Command):
         with open(self.remap_rules_path, "r", encoding="utf-8") as f:
             remap_rules = yaml.safe_load(f)
             if not remap_rules:
-                self.logger.warning("No remap rules found in %s.", self.remap_rules_path)
+                self.logger.warning(
+                    "No remap rules found in %s.", self.remap_rules_path
+                )
                 remap_rules = {}
             self.logger.info(
-                "Loaded %d remap rules from %s", len(remap_rules), self.remap_rules_path
+                "Loaded %d remap rules from %s",
+                len(remap_rules),
+                self.remap_rules_path,
             )
 
         # 4. Apply remapping
@@ -137,8 +143,10 @@ class RemapCommand(Command):
                 )
 
         if new_tokens_to_add:
-            self.logger.info("Adding %d new tokens to the tokenizer.", len(new_tokens_to_add))
-            tokenizer.add_tokens(list(set(new_tokens_to_add))) # Add unique new tokens
+            self.logger.info(
+                "Adding %d new tokens to the tokenizer.", len(new_tokens_to_add)
+            )
+            tokenizer.add_tokens(list(set(new_tokens_to_add)))  # Add unique new tokens
             self.logger.info(
                 "New tokenizer vocab size after adding tokens: %d",
                 tokenizer.get_vocab_size(),
@@ -146,16 +154,19 @@ class RemapCommand(Command):
         else:
             self.logger.info("No new tokens to add based on remap rules.")
 
-
         # 5. Save the remapped tokenizer
         self.remapped_tokenizer_path.mkdir(parents=True, exist_ok=True)
         tokenizer.save(str(self.remapped_tokenizer_path / "tokenizer.json"))
 
         self.logger.info(
-            "Remapped tokenizer saved to %s", self.remapped_tokenizer_path / "tokenizer.json"
+            "Remapped tokenizer saved to %s",
+            self.remapped_tokenizer_path / "tokenizer.json",
         )
         self.logger.info("Remap Command finished.")
-        return {"status": "success", "remapped_tokenizer_path": str(self.remapped_tokenizer_path)}
+        return {
+            "status": "success",
+            "remapped_tokenizer_path": str(self.remapped_tokenizer_path),
+        }
 
     def get_name(self) -> str:
         """커맨드 이름 반환"""

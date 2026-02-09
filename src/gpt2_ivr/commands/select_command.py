@@ -1,4 +1,5 @@
 """IVR 교체 후보 선정 커맨드"""
+
 from __future__ import annotations
 
 from pathlib import Path
@@ -14,9 +15,15 @@ class SelectCommand(Command):
 
     def __init__(
         self,
-        frequency_path: Path = Path("artifacts/analysis/reports/token_frequency.parquet"),
-        sequences_path: Path = Path("artifacts/analysis/reports/bpe_token_id_sequences.txt"),
-        output_csv: Path = Path("artifacts/analysis/reports/replacement_candidates.csv"),
+        frequency_path: Path = Path(
+            "artifacts/analysis/reports/token_frequency.parquet"
+        ),
+        sequences_path: Path = Path(
+            "artifacts/analysis/reports/bpe_token_id_sequences.txt"
+        ),
+        output_csv: Path = Path(
+            "artifacts/analysis/reports/replacement_candidates.csv"
+        ),
         output_log: Path = Path("artifacts/analysis/reports/selection_log.md"),
         model_name: str = "openai-community/gpt2",
         max_candidates: int = 1000,

@@ -63,6 +63,7 @@ gpt2-ivr/
         ├─ commands/            # Command 패턴 구현
         │   ├─ __init__.py
         │   ├─ base.py          # Command 추상 클래스
+        │   ├─ init_command.py
         │   ├─ analyze_command.py
         │   ├─ distill_command.py
         │   └─ select_command.py
@@ -103,6 +104,7 @@ gpt2-ivr/
 모든 단계는 엔트리 포인트를 통해 실행합니다.
 
 ```bash
+uv run ivr init
 uv run ivr analyze
 uv run ivr distill-tokenizer
 uv run ivr select
@@ -290,7 +292,19 @@ artifacts/corpora/cleaned/ # 정제 완료 데이터
 
 ---
 
-### 3️⃣ BPE 토큰 시퀀스 생성
+### 3️⃣ 모델 및 토크나이저 초기화
+
+```bash
+uv run ivr init
+```
+
+- Hugging Face Hub에서 GPT-2 토크나이저와 모델 설정을 다운로드
+- 산출물: `artifacts/tokenizers/original/`
+- `--force` 옵션으로 기존 파일이 있어도 다시 다운로드 가능
+
+---
+
+### 4️⃣ BPE 토큰 시퀀스 생성
 
 ```bash
 uv run ivr analyze
@@ -301,7 +315,7 @@ uv run ivr analyze
 
 ---
 
-### 4️⃣ Tokenizer Distillation (BPE → Unigram)
+### 5️⃣ Tokenizer Distillation (BPE → Unigram)
 
 ```bash
 uv run ivr distill-tokenizer
@@ -312,7 +326,7 @@ uv run ivr distill-tokenizer
 
 ---
 
-### 5️⃣ IVR 대상 토큰 선정
+### 6️⃣ IVR 대상 토큰 선정
 
 ```bash
 uv run ivr select
@@ -323,7 +337,7 @@ uv run ivr select
 
 ---
 
-### 6️⃣ 토큰 교체 및 tokenizer 생성
+### 7️⃣ 토큰 교체 및 tokenizer 생성
 
 ```bash
 uv run ivr remap
@@ -334,7 +348,7 @@ uv run ivr remap
 
 ---
 
-### 7️⃣ Embedding 재정렬
+### 8️⃣ Embedding 재정렬
 
 ```bash
 uv run ivr align
@@ -344,7 +358,7 @@ uv run ivr align
 
 ---
 
-### 8️⃣ 미세조정
+### 9️⃣ 미세조정
 
 ```bash
 uv run ivr train

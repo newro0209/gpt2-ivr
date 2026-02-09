@@ -1,4 +1,5 @@
 """파이프라인 커맨드 추상 인터페이스"""
+
 from __future__ import annotations
 
 from abc import ABC, abstractmethod
