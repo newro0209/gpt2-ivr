@@ -18,18 +18,30 @@ class RemapCommand(Command):
 
     def __init__(
         self,
-        distilled_tokenizer_dir: Path = Path("artifacts/tokenizers/distilled_unigram"),
-        remapped_tokenizer_dir: Path = Path("artifacts/tokenizers/remapped"),
-        remap_rules_path: Path = Path("src/gpt2_ivr/tokenizer/remap_rules.yaml"),
-        replacement_candidates_path: Path = Path(
-            "artifacts/analysis/reports/replacement_candidates.csv"
-        ),
+        distilled_tokenizer_dir: Path | str = "artifacts/tokenizers/distilled_unigram",
+        remapped_tokenizer_dir: Path | str = "artifacts/tokenizers/remapped",
+        remap_rules_path: Path | str = "src/gpt2_ivr/tokenizer/remap_rules.yaml",
+        replacement_candidates_path: Path | str = "artifacts/analysis/reports/replacement_candidates.csv",
     ) -> None:
         self.logger = get_logger("gpt2_ivr.remap")
-        self.distilled_tokenizer_path = distilled_tokenizer_dir
-        self.remapped_tokenizer_path = remapped_tokenizer_dir
-        self.remap_rules_path = remap_rules_path
-        self.replacement_candidates_path = replacement_candidates_path
+        self.distilled_tokenizer_path = (
+            Path(distilled_tokenizer_dir)
+            if isinstance(distilled_tokenizer_dir, str)
+            else distilled_tokenizer_dir
+        )
+        self.remapped_tokenizer_path = (
+            Path(remapped_tokenizer_dir)
+            if isinstance(remapped_tokenizer_dir, str)
+            else remapped_tokenizer_dir
+        )
+        self.remap_rules_path = (
+            Path(remap_rules_path) if isinstance(remap_rules_path, str) else remap_rules_path
+        )
+        self.replacement_candidates_path = (
+            Path(replacement_candidates_path)
+            if isinstance(replacement_candidates_path, str)
+            else replacement_candidates_path
+        )
 
     def execute(self, **kwargs: Any) -> dict[str, Any]:
         """커맨드 실행 로직"""

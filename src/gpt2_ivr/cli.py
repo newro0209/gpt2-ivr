@@ -225,9 +225,11 @@ def create_command(command_name: str, args: argparse.Namespace) -> Command:
         )
 
     def create_align_command(args: argparse.Namespace) -> AlignCommand:
+        # TODO: align 커맨드에 CLI 옵션이 추가되면 args를 사용하여 파라미터 전달
         return AlignCommand()
 
     def create_train_command(args: argparse.Namespace) -> TrainCommand:
+        # TODO: train 커맨드에 CLI 옵션이 추가되면 args를 사용하여 파라미터 전달
         return TrainCommand()
 
     command_factories = {
