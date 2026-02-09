@@ -41,7 +41,6 @@ class AnalyzeCommand(Command):
         workers: 스레드 워커 수 (0이면 CPU - 1)
         chunk_size: 스레드 청크 크기 (0이면 자동 설정)
         max_texts: 처리할 최대 텍스트 수 (0이면 전체)
-        text_key: json/jsonl 텍스트 키
         encoding: 입력 파일 인코딩
     """
 
@@ -54,7 +53,6 @@ class AnalyzeCommand(Command):
         workers: int,
         chunk_size: int,
         max_texts: int,
-        text_key: str,
         encoding: str,
     ):
         self.input_dir = input_dir
@@ -64,7 +62,6 @@ class AnalyzeCommand(Command):
         self.workers = workers
         self.chunk_size = chunk_size
         self.max_texts = max_texts
-        self.text_key = text_key
         self.encoding = encoding
 
     def execute(self, **kwargs: Any) -> dict[str, Any]:
@@ -86,7 +83,6 @@ class AnalyzeCommand(Command):
             workers=self.workers,
             chunk_size=self.chunk_size,
             max_texts=self.max_texts,
-            text_key=self.text_key,
             encoding=self.encoding,
         )
 

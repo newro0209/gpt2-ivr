@@ -6,7 +6,6 @@
 
 from __future__ import annotations
 
-import json
 import logging
 from collections import Counter
 from concurrent.futures import ThreadPoolExecutor
@@ -43,7 +42,7 @@ def find_input_files(input_dir: Path, inputs: list[Path]) -> list[Path]:
     """분석 대상 파일 목록을 수집한다.
 
     input_dir에서 재귀적으로 파일을 탐색하고, inputs 리스트의 파일을 추가한다.
-    .txt, .jsonl, .json 확장자만 허용한다.
+    .txt 확장자만 허용한다.
 
     Args:
         input_dir: 재귀 탐색할 디렉토리
@@ -52,7 +51,7 @@ def find_input_files(input_dir: Path, inputs: list[Path]) -> list[Path]:
     Returns:
         중복 제거된 정렬된 파일 경로 목록
     """
-    allowed_suffixes = {".txt", ".jsonl", ".json"}
+    allowed_suffixes = {".txt"}
     files: list[Path] = []
 
     if input_dir.exists():
@@ -65,57 +64,6 @@ def find_input_files(input_dir: Path, inputs: list[Path]) -> list[Path]:
             files.append(path)
 
     return sorted(set(files))
-
-
-def iter_texts(files: list[Path], text_key: str, encoding: str) -> Iterator[str]:
-    """파일에서 텍스트 스트림을 생성한다.
-
-    .txt, .jsonl, .json 형식을 지원하며, 빈 줄은 자동으로 건너뛴다.
-
-    Args:
-        files: 읽을 파일 경로 목록
-        text_key: JSON 객체에서 텍스트를 추출할 키 이름
-        encoding: 파일 인코딩
-
-    Yields:
-        텍스트 문자열 (빈 줄 제외)
-    """
-    for path in files:
-        suffix = path.suffix.lower()
-        if suffix == ".txt":
-            with path.open("r", encoding=encoding) as handle:
-                for line in handle:
-                    text = line.rstrip("\n")
-                    if text.strip():
-                        yield text
-            continue
-
-        if suffix == ".jsonl":
-            with path.open("r", encoding=encoding) as handle:
-                for line in handle:
-                    line = line.strip()
-                    if not line:
-                        continue
-                    record = json.loads(line)
-                    if text_key in record and isinstance(record[text_key], str):
-                        text = record[text_key].strip()
-                        if text:
-                            yield text
-            continue
-
-        if suffix == ".json":
-            with path.open("r", encoding=encoding) as handle:
-                payload = json.load(handle)
-            if isinstance(payload, list):
-                for record in payload:
-                    if isinstance(record, dict) and text_key in record:
-                        text = str(record[text_key]).strip()
-                        if text:
-                            yield text
-            elif isinstance(payload, dict) and text_key in payload:
-                text = str(payload[text_key]).strip()
-                if text:
-                    yield text
 
 
 def write_frequency_parquet(counter: Counter[int], output_path: Path) -> None:
@@ -184,7 +132,6 @@ def analyze_token_frequency(
     inputs: list[Path],
     output_frequency: Path,
     tokenizer_dir: Path,
-    text_key: str,
     workers: int,
     chunk_size: int,
     max_texts: int,
@@ -198,7 +145,6 @@ def analyze_token_frequency(
         output_sequences: BPE 토큰 시퀀스 출력 경로
         output_frequency: 토큰 빈도 parquet 출력 경로
         tokenizer_dir: 원본 토크나이저 디렉토리
-        text_key: json/jsonl 텍스트 키
         workers: 스레드 워커 수 (0이면 CPU - 1)
         chunk_size: 스레드 청크 크기 (0이면 자동 설정)
         max_texts: 처리할 최대 텍스트 수 (0이면 전체)
@@ -218,17 +164,22 @@ def analyze_token_frequency(
     logger.info("입력 파일 %d개 탐색 완료", len(input_files))
 
     # 2) 텍스트 스트림 구성
-    texts = iter_texts(input_files, text_key, encoding)
+    def _line_iterator() -> Iterator[str]:
+        for path in input_files:
+            with path.open("r", encoding=encoding) as handle:
+                for line in handle:
+                    text = line.rstrip("\n")
+                    if text:
+                        yield text
+
+    texts = _line_iterator()
     if max_texts > 0:
         texts = islice(texts, max_texts)
         logger.info("최대 %d개 텍스트만 처리", max_texts)
 
     # 3) 토크나이저 로드
     tokenizer_files = list(tokenizer_dir.glob("*")) if tokenizer_dir.exists() else []
-    has_tokenizer_files = any(
-        f.name in ["tokenizer.json", "vocab.json", "merges.txt"]
-        for f in tokenizer_files
-    )
+    has_tokenizer_files = any(f.name in ["tokenizer.json", "vocab.json", "merges.txt"] for f in tokenizer_files)
     if not has_tokenizer_files:
         raise FileNotFoundError(f"원본 토크나이저 파일이 없습니다: {tokenizer_dir}")
 
