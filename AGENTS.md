@@ -48,6 +48,66 @@
 - 주석, 문서, 로그 메시지는 한국어로 작성한다.
 - 가독성 개선 목적의 이모지 사용을 허용한다.
 
+### 로깅 및 UX 가이드라인
+
+프로젝트는 **도메인 레이어**(비즈니스 로직)와 **어플리케이션 레이어**(CLI 커맨드)로 계층화되어 있으며, 각 레이어는 다른 접근 방식을 따른다.
+
+#### 도메인 레이어 (analysis/, embedding/, tokenizer/)
+
+- **목적**: 재사용 가능한 순수 비즈니스 로직 제공
+- **로깅**: 필수 정보만 간결하게 로깅
+- **UX**: 신경 쓰지 않음 (어플리케이션 레이어가 담당)
+- **어조**: 통일되고 간결한 사실 전달
+  - ✅ "토크나이저 로드: %s"
+  - ✅ "임베딩 추출 완료"
+  - ❌ "🚀 토크나이저를 로드합니다..."
+  - ❌ "✅ 임베딩 추출이 완료되었습니다!"
+- **규칙**:
+  - 이모지 및 장식 문자 사용 금지
+  - "~를 시작합니다", "~했습니다" 등 장황한 표현 지양
+  - "~ 시작", "~ 완료" 형태로 간결하게 작성
+  - 들여쓰기 장식(`└─`, `  ├─` 등) 사용 금지
+  - 중요한 단계 전환 또는 에러/경고만 로깅
+
+#### 어플리케이션 레이어 (commands/)
+
+- **목적**: 사용자 대면 인터페이스 제공
+- **로깅**: 디버깅용 최소한의 로깅만 유지
+- **UX**: Rich 라이브러리로 시각적 출력 제공
+- **도구**:
+  - `rich.table.Table`: 구조화된 결과 출력
+  - `rich.panel.Panel`: 단계 구분 및 완료 메시지
+  - `rich.progress.track`: 진행 상황 표시
+  - `rich.console.Console`: 통합 출력 관리
+- **규칙**:
+  - 사용자 대면 출력은 Rich 컴포넌트 사용
+  - logger.info는 디버깅 정보만 남김 (사용자는 보지 않음)
+  - 색상, 테두리, 정렬로 가독성 향상
+  - 결과 요약은 Table 또는 Panel로 표시
+
+#### 로깅 메시지 작성 예시
+
+```python
+# 도메인 레이어 - 간결한 로깅
+logger.info("토크나이저 로드: %s", tokenizer_dir)
+logger.info("vocab 크기: %d", vocab_size)
+logger.info("임베딩 추출 완료")
+
+# 어플리케이션 레이어 - Rich 기반 UX
+console = Console()
+table = Table(title="초기화 완료", show_header=False, title_style="bold green")
+table.add_row("vocab 크기", f"{vocab_size:,}")
+table.add_row("토크나이저 경로", str(tokenizer_dir))
+console.print(table)
+
+panel = Panel(
+    "[bold cyan]단계 완료[/bold cyan]\n\n경로: /path/to/output",
+    title="결과",
+    border_style="green"
+)
+console.print(panel)
+```
+
 ### Docstring 작성 규칙
 
 - **모든 모듈, 클래스, 공개 함수/메서드에 docstring을 작성한다.**
