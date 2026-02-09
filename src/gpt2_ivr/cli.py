@@ -30,7 +30,7 @@ def build_parser() -> argparse.ArgumentParser:
         description="Tokenizer Model Migration + IVR 파이프라인 CLI",
     )
     subparsers = parser.add_subparsers(dest="command", required=True)
-    
+
     # analyze 서브커맨드
     analyze_parser = subparsers.add_parser("analyze", help="BPE 토큰 시퀀스 분석")
     analyze_parser.add_argument(
@@ -71,7 +71,7 @@ def build_parser() -> argparse.ArgumentParser:
         default=0,
         help="처리할 최대 텍스트 수 (0이면 전체)",
     )
-    
+
     # distill-tokenizer 서브커맨드
     distill_parser = subparsers.add_parser(
         "distill-tokenizer", help="BPE -> Unigram distillation"
@@ -102,7 +102,7 @@ def build_parser() -> argparse.ArgumentParser:
         default="openai-community/gpt2",
         help="모델 이름",
     )
-    
+
     # select 서브커맨드
     select_parser = subparsers.add_parser("select", help="IVR 대상 토큰 선정")
     select_parser.add_argument(
@@ -142,7 +142,7 @@ def build_parser() -> argparse.ArgumentParser:
         default=2,
         help="보호 토큰 최소 길이",
     )
-    
+
     # remap 서브커맨드
     remap_parser = subparsers.add_parser("remap", help="토큰 재할당 규칙 적용")
     remap_parser.add_argument(
@@ -165,13 +165,13 @@ def build_parser() -> argparse.ArgumentParser:
         default="artifacts/analysis/reports/replacement_candidates.csv",
         help="교체 후보 CSV 경로",
     )
-    
+
     # align 서브커맨드 (현재 stub)
     subparsers.add_parser("align", help="embedding 재정렬")
-    
+
     # train 서브커맨드 (현재 stub)
     subparsers.add_parser("train", help="미세조정")
-    
+
     return parser
 
 
@@ -184,7 +184,7 @@ def print_intro(logger: logging.Logger) -> None:
 def create_command(command_name: str, args: argparse.Namespace) -> Command:
     """커맨드 이름에 해당하는 Command 객체를 생성한다."""
     from pathlib import Path
-    
+
     if command_name == "analyze":
         return AnalyzeCommand(
             input_dir=Path(args.input_dir),
