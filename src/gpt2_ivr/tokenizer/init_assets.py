@@ -7,6 +7,7 @@ from typing import TypedDict
 
 from transformers import AutoTokenizer, AutoConfig
 
+from gpt2_ivr.constants import TOKENIZER_ORIGINAL_DIR
 from gpt2_ivr.utils.logging_config import get_logger
 
 logger = get_logger(__name__)
@@ -22,7 +23,7 @@ class InitResult(TypedDict):
 
 def initialize_assets(
     model_name: str = "openai-community/gpt2",
-    tokenizer_dir: Path = Path("artifacts/tokenizers/original"),
+    tokenizer_dir: Path = TOKENIZER_ORIGINAL_DIR,
     force: bool = False,
 ) -> InitResult:
     """Hugging Face Hub에서 GPT-2 토크나이저와 모델 설정을 다운로드한다.

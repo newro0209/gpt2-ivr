@@ -248,6 +248,43 @@ artifacts/analysis/reports/
 
 ---
 
+## 📂 중앙화된 경로 상수 관리
+
+모든 artifacts 경로는 `src/gpt2_ivr/constants.py`에서 중앙 관리됩니다.
+
+### 주요 경로 상수
+
+```python
+from gpt2_ivr.constants import (
+    # 코퍼스 경로
+    CORPORA_CLEANED_DIR,           # artifacts/corpora/cleaned
+    
+    # 토크나이저 경로
+    TOKENIZER_ORIGINAL_DIR,        # artifacts/tokenizers/original
+    TOKENIZER_DISTILLED_UNIGRAM_DIR,  # artifacts/tokenizers/distilled_unigram
+    TOKENIZER_REMAPPED_DIR,        # artifacts/tokenizers/remapped
+    
+    # 분석 산출물 경로
+    BPE_TOKEN_ID_SEQUENCES_FILE,   # artifacts/analysis/reports/bpe_token_id_sequences.txt
+    TOKEN_FREQUENCY_FILE,          # artifacts/analysis/reports/token_frequency.parquet
+    REPLACEMENT_CANDIDATES_FILE,   # artifacts/analysis/reports/replacement_candidates.csv
+    SELECTION_LOG_FILE,            # artifacts/analysis/reports/selection_log.md
+    
+    # 로그 및 학습 경로
+    LOGS_DIR,                      # artifacts/logs
+    TRAINING_CHECKPOINT_DIR,       # artifacts/training/sft_checkpoint
+)
+```
+
+### 장점
+
+- **일관성**: 모든 코드가 동일한 경로 상수를 참조
+- **유지보수성**: 경로 변경 시 한 곳만 수정
+- **가독성**: 경로의 의미가 명확한 상수명으로 표현
+- **타입 안전성**: Path 객체로 타입 체크 가능
+
+---
+
 ## 🧰 환경 및 도구
 
 | 항목           | 스택                                      |

@@ -11,6 +11,11 @@ import yaml
 from tokenizers import Tokenizer
 
 from gpt2_ivr.commands.base import Command
+from gpt2_ivr.constants import (
+    REPLACEMENT_CANDIDATES_FILE,
+    TOKENIZER_DISTILLED_UNIGRAM_DIR,
+    TOKENIZER_REMAPPED_DIR,
+)
 from gpt2_ivr.utils.logging_config import get_logger
 
 
@@ -19,12 +24,10 @@ class RemapCommand(Command):
 
     def __init__(
         self,
-        distilled_tokenizer_dir: Path = Path("artifacts/tokenizers/distilled_unigram"),
-        remapped_tokenizer_dir: Path = Path("artifacts/tokenizers/remapped"),
+        distilled_tokenizer_dir: Path = TOKENIZER_DISTILLED_UNIGRAM_DIR,
+        remapped_tokenizer_dir: Path = TOKENIZER_REMAPPED_DIR,
         remap_rules_path: Path = Path("src/gpt2_ivr/tokenizer/remap_rules.yaml"),
-        replacement_candidates_path: Path = Path(
-            "artifacts/analysis/reports/replacement_candidates.csv"
-        ),
+        replacement_candidates_path: Path = REPLACEMENT_CANDIDATES_FILE,
     ) -> None:
         self.logger = get_logger("gpt2_ivr.remap")
         self.distilled_tokenizer_path = distilled_tokenizer_dir

@@ -5,6 +5,8 @@ import sys
 from datetime import datetime
 from pathlib import Path
 
+from gpt2_ivr.constants import LOGS_DIR
+
 
 def setup_logging(
     level: int = logging.INFO,
@@ -21,7 +23,7 @@ def setup_logging(
         level: 로깅 레벨
         format_string: 로그 포맷 문자열
         log_to_file: 파일로 로그를 저장할지 여부
-        log_dir: 로그 파일 저장 디렉토리 (None이면 artifacts/logs/ 사용)
+        log_dir: 로그 파일 저장 디렉토리 (None이면 LOGS_DIR 상수 사용)
     """
     root_logger = logging.getLogger()
 
@@ -39,7 +41,7 @@ def setup_logging(
     # 파일 핸들러 설정
     if log_to_file:
         if log_dir is None:
-            log_dir = Path("artifacts/logs")
+            log_dir = LOGS_DIR
         log_dir.mkdir(parents=True, exist_ok=True)
 
         timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")

@@ -12,6 +12,7 @@ from typing import Iterable, Iterator, cast
 from tqdm import tqdm
 from transformers import BatchEncoding, GPT2Tokenizer
 
+from gpt2_ivr.constants import BPE_TOKEN_ID_SEQUENCES_FILE, CORPORA_CLEANED_DIR
 from gpt2_ivr.utils.logging_config import get_logger
 
 logger = get_logger(__name__)
@@ -133,7 +134,7 @@ def parse_args() -> argparse.Namespace:
     parser.add_argument(
         "--input-dir",
         type=Path,
-        default=Path("artifacts/corpora/cleaned"),
+        default=CORPORA_CLEANED_DIR,
         help="코퍼스 입력 디렉토리",
     )
     parser.add_argument(
@@ -164,7 +165,7 @@ def parse_args() -> argparse.Namespace:
     parser.add_argument(
         "--output",
         type=Path,
-        default=Path("artifacts/analysis/reports/bpe_token_id_sequences.txt"),
+        default=BPE_TOKEN_ID_SEQUENCES_FILE,
         help="BPE token id 시퀀스 출력 경로",
     )
     parser.add_argument(
