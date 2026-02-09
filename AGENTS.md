@@ -114,6 +114,7 @@
 ### 작업 흐름
 
 1. **작업 시작**: 새 브랜치 생성
+
    ```bash
    git checkout -b <브랜치-타입>/<작업명>
    ```
@@ -123,6 +124,7 @@
    - 한 커밋에는 한 단계의 논리적 변경만 포함
 
 3. **작업 완료**: 브랜치 푸시 및 master 머지
+
    ```bash
    git push -u origin <브랜치명>
    git checkout master
