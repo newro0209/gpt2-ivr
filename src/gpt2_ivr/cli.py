@@ -11,7 +11,7 @@ import logging
 from collections.abc import Callable
 from dataclasses import dataclass
 from datetime import datetime
-from functools import lru_cache, partial
+from functools import lru_cache
 from pathlib import Path
 from time import perf_counter
 from typing import Any
