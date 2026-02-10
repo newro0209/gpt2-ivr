@@ -11,7 +11,7 @@ import logging
 from collections.abc import Callable
 from dataclasses import dataclass
 from datetime import datetime
-from functools import lru_cache, partial
+from functools import lru_cache
 from pathlib import Path
 from time import perf_counter
 from typing import Any
@@ -143,9 +143,14 @@ def validate_int(value: str, minimum: int = 0) -> int:
         raise argparse.ArgumentTypeError("정수를 입력해야 합니다.") from e
 
 
-# Partial application으로 중복 제거
-non_negative_int = partial(validate_int, minimum=0)
-positive_int = partial(validate_int, minimum=1)
+def non_negative_int(value: str) -> int:
+    """0 이상의 정수를 검증한다."""
+    return validate_int(value, minimum=0)
+
+
+def positive_int(value: str) -> int:
+    """1 이상의 정수를 검증한다."""
+    return validate_int(value, minimum=1)
 
 
 def add_common_args(parser: argparse.ArgumentParser, *args: str) -> None:
@@ -453,7 +458,7 @@ def format_value(value: Any) -> str:
     return formatted[:117] + "..." if len(formatted) > 120 else formatted
 
 
-def create_result_table(command_name: str, elapsed: float, result: dict[str, Any]) -> Panel:
+def create_result_panel(command_name: str, elapsed: float, result: dict[str, Any]) -> Panel:
     """실행 결과 테이블을 생성한다.
 
     Args:
@@ -559,7 +564,7 @@ def main() -> int:
         elapsed = perf_counter() - start
 
         logger.info("\\[%s\\] 단계 완료 (%.2fs)", command_name, elapsed)
-        CONSOLE.print(create_result_table(command_name, elapsed, result))
+        CONSOLE.print(create_result_panel(command_name, elapsed, result))
         return 0
 
     except KeyboardInterrupt:

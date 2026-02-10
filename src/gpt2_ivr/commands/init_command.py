@@ -10,6 +10,7 @@ from pathlib import Path
 from typing import Any
 
 from rich.console import Console
+from rich.panel import Panel
 from rich.table import Table
 
 from gpt2_ivr.corpus.normalize import normalize_raw_corpora
@@ -81,8 +82,6 @@ class InitCommand(Command):
         )
 
         # Rich 테이블로 결과 출력
-        from rich.panel import Panel
-
         table = Table(title="🚀 초기화 완료", show_header=True, title_style="bold green")
         table.add_column("항목", style="bold cyan", width=25)
         table.add_column("값", style="yellow", justify="left")
@@ -90,9 +89,9 @@ class InitCommand(Command):
         table.add_row("모델", f"[bold]{result['model_name']}[/bold]")
         table.add_row("Vocab 크기", f"{result['vocab_size']:,}개")
         table.add_row("", "")  # 빈 줄
-        table.add_row("토크나이저 경로", str(result["tokenizer_dir"].name))
+        table.add_row("토크나이저 경로", str(result["tokenizer_dir"]))
         table.add_row("정제된 코퍼스", f"{len(normalized_corpora):,}개 파일")
-        table.add_row("코퍼스 경로", str(self.cleaned_corpora_dir.name))
+        table.add_row("코퍼스 경로", str(self.cleaned_corpora_dir))
 
         console.print()
         console.print(table)
