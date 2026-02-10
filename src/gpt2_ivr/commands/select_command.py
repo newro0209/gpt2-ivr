@@ -104,12 +104,12 @@ class SelectCommand(Command):
         table.add_column("값", style="yellow", justify="right")
 
         table.add_row("교체 후보 쌍", f"{len(pairs):,}개")
-        table.add_row("희생 후보 풀", f"{len(sacrifices):,}개")
+        table.add_row("희생 후보", f"{len(sacrifices):,}개")
         table.add_row("신규 토큰 후보", f"{len(new_tokens_list):,}개")
         table.add_row("고유 바이그램", f"{len(bigram_counts):,}개")
         table.add_row("", "")  # 빈 줄
-        table.add_row("CSV 파일", str(self.output_csv.name))
-        table.add_row("로그 파일", str(self.output_log.name))
+        table.add_row("CSV 파일", str(self.output_csv))
+        table.add_row("로그 파일", str(self.output_log))
 
         console.print()
         console.print(table)
@@ -122,7 +122,7 @@ class SelectCommand(Command):
             sample_table.add_column("신규 토큰", style="green", width=30)
             sample_table.add_column("빈도", style="yellow", width=12, justify="right")
 
-            for idx, pair in enumerate(pairs[:5], 1):
+            for pair in pairs[:5]:
                 sacrifice_id = pair.sacrifice.token_id
                 new_token = pair.new_token.merged_str
                 frequency = pair.new_token.bigram_freq

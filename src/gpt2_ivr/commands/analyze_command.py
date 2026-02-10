@@ -115,8 +115,8 @@ class AnalyzeCommand(Command):
         table.add_row("고유 토큰 수", f"{unique_tokens:,}개")
         table.add_row("평균 빈도", f"{avg_frequency:.2f}회")
         table.add_row("", "")  # 빈 줄
-        table.add_row("빈도 파일", str(self.output_frequency.name))
-        table.add_row("시퀀스 파일", str(self.output_sequences.name))
+        table.add_row("빈도 파일", str(self.output_frequency))
+        table.add_row("시퀀스 파일", str(self.output_sequences))
 
         console.print()
         console.print(table)

@@ -11,6 +11,7 @@ from typing import Any
 
 from rich.console import Console
 from rich.panel import Panel
+from rich.table import Table
 
 from gpt2_ivr.tokenizer import distill_unigram_tokenizer
 
@@ -57,8 +58,6 @@ class DistillCommand(Command):
         )
 
         # Rich 테이블로 결과 출력
-        from rich.table import Table
-
         table = Table(title="🔬 토크나이저 증류 결과", show_header=True, title_style="bold green")
         table.add_column("항목", style="bold cyan", width=25)
         table.add_column("값", style="yellow", justify="right")
@@ -69,14 +68,13 @@ class DistillCommand(Command):
         diff_style = "green" if vocab_diff == 0 else "red" if vocab_diff < 0 else "yellow"
         table.add_row("차이", f"[{diff_style}]{vocab_diff:+,}개[/{diff_style}]")
         table.add_row("", "")  # 빈 줄
-        table.add_row("저장 경로", str(result['output_dir'].name))
+        table.add_row("저장 경로", str(result['output_dir']))
 
         console.print()
         console.print(table)
         console.print()
 
         # 성공 메시지
-        from rich.panel import Panel
         console.print(Panel(
             "[bold green]✅ Unigram 토크나이저 증류가 성공적으로 완료되었습니다[/bold green]",
             border_style="green",
