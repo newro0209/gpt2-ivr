@@ -133,7 +133,7 @@ from gpt2_ivr.constants import (
 
 ### 로깅 및 UX 가이드라인
 
-프로젝트는 **도메인 레이어**(비즈니스 로직)와 **어플리케이션 레이어**(CLI 커맨드)로 계층화되어 있으며, 각 레이어는 다른 접근 방식을 따른다.
+본 프로젝트는 **도메인 레이어**(비즈니스 로직)와 **어플리케이션 레이어**(CLI 커맨드)로 계층화되어 있으며, 각 레이어는 다른 접근 방식을 따른다.
 
 #### 도메인 레이어 (analysis/, embedding/, tokenizer/)
 
@@ -141,10 +141,10 @@ from gpt2_ivr.constants import (
 - **로깅**: 필수 정보만 간결하게 로깅
 - **UX**: 신경 쓰지 않음 (어플리케이션 레이어가 담당)
 - **어조**: 통일되고 간결한 사실 전달
-  - ✅ "토크나이저 로드: %s"
+  - ✅ "%d개의 문서 색인 완료"
   - ✅ "임베딩 추출 완료"
-  - ❌ "🚀 토크나이저를 로드합니다..."
-  - ❌ "✅ 임베딩 추출이 완료되었습니다!"
+  - ❌ "문서 개수: %d"
+  - ❌ "vocab 크기: %d"
 - **규칙**:
   - 이모지 및 장식 문자 사용 금지
   - "~를 시작합니다", "~했습니다" 등 장황한 표현 지양
@@ -170,22 +170,26 @@ from gpt2_ivr.constants import (
 
 #### 로깅 메시지 작성 예시
 
-```python
-# 도메인 레이어 - 간결한 로깅
-logger.info("토크나이저 로드: %s", tokenizer_dir)
-logger.info("vocab 크기: %d", vocab_size)
-logger.info("임베딩 추출 완료")
+#### 도메인 레이어 - 간결한 로깅 (문장형)
 
-# 어플리케이션 레이어 - Rich 기반 UX
+```python
+logger.info("%s에서 토크나이저 로드 완료", tokenizer_dir)
+logger.info("%d개의 vocab으로 초기화", vocab_size)
+logger.info("임베딩 추출 완료")
+```
+
+#### 어플리케이션 레이어 - Rich 기반 UX
+
+```python
 console = Console()
 table = Table(title="초기화 완료", show_header=False, title_style="bold green")
-table.add_row("vocab 크기", f"{vocab_size:,}")
-table.add_row("토크나이저 경로", str(tokenizer_dir))
+table.add_row("Vocab 토큰", f"{vocab_size:,}개")
+table.add_row("토크나이저", str(tokenizer_dir))
 console.print(table)
 
 panel = Panel(
-    "[bold cyan]단계 완료[/bold cyan]\n\n경로: /path/to/output",
-    title="결과",
+    "[bold cyan]임베딩 추출 완료[/bold cyan]\n\n결과물: /path/to/output",
+    title="✅ 처리 완료",
     border_style="green"
 )
 console.print(panel)
@@ -233,15 +237,47 @@ console.print(panel)
 - 린트 규칙 위반 사항이 없도록 수정하거나, 필요시 `.markdownlint.json`에서 규칙을 조정한다.
 - 주요 마크다운 파일: `README.md`, `AGENTS.md`, `GEMINI.md` 등
 
-## 테스트 가이드라인
+## 계층별 테스트 전략
 
-- 현재 파이프라인의 1차 검증은 단계별 산출물 확인으로 수행한다.
-- 아래 핵심 산출물 생성을 실행 검증 기준으로 사용한다.
+아키텍처 계층에 대응하는 3단계 테스트 전략을 적용한다.
+
+### 단위 테스트 (Unit Test) — 도메인 계층
+
+- **대상**: `analysis/`, `tokenizer/`, `embedding/`, `training/`의 순수 로직 함수
+- **목적**: 개별 함수의 입출력 정확성을 검증한다.
+- **특성**:
+  - 외부 I/O 없이 실행 가능해야 한다.
+  - 대용량 모델/데이터 의존 시 `tmp_path` 픽스처로 경량 테스트 데이터를 생성한다.
+  - 실행 시간 1초 이내를 목표로 한다.
+- **예시**: BPE 토큰 분할 로직, 후보 선정 점수 계산, 임베딩 재배치 인덱스 매핑
+
+### 통합 테스트 (Integration Test) — 애플리케이션 계층
+
+- **대상**: `commands/`의 Command 클래스
+- **목적**: 도메인 로직 조합과 파일 I/O 흐름이 정상 동작하는지 검증한다.
+- **특성**:
+  - `tmp_path`에 입력 산출물을 준비하고, Command 실행 후 출력 산출물의 존재·형식을 검사한다.
+  - GPU가 필요한 테스트는 `@pytest.mark.gpu`로 마킹하여 CI에서 선택 실행한다.
+- **예시**: `AnalyzeCommand` 실행 후 `bpe_token_id_sequences.txt` 생성 여부 확인
+
+### E2E 테스트 (End-to-End Test) — 파이프라인 전체
+
+- **대상**: CLI 엔트리 포인트(`cli.py`)를 통한 전체 파이프라인
+- **목적**: 실제 실행 환경에서 핵심 산출물이 정상 생성되는지 검증한다.
+- **검증 산출물**:
   - `artifacts/analysis/reports/bpe_token_id_sequences.txt`
   - `artifacts/analysis/reports/replacement_candidates.csv`
   - `artifacts/tokenizers/distilled_unigram/`
   - `artifacts/tokenizers/remapped/`
-- 테스트 프레임워크 도입 시 테스트 코드는 `tests/`에 배치하고 파일명은 `test_*.py` 규칙을 따른다.
+- **특성**:
+  - 로컬 또는 CI에서 `ivr` CLI 명령을 직접 호출하여 실행한다.
+  - 실행 시간이 길므로 전체 회귀 검증 시에만 수행한다.
+
+### 공통 규칙
+
+- 테스트 코드는 `tests/`에 배치하고 파일명은 `test_*.py` 규칙을 따른다.
+- 디렉토리 구조는 소스 계층을 반영한다: `tests/unit/`, `tests/integration/`, `tests/e2e/`.
+- 테스트 실행 명령: `uv run pytest tests/`.
 - 자동화 테스트 명령어가 확정되면 본 문서와 `README.md`에 동시에 반영한다.
 
 ## Git 브랜치 전략 및 워크플로우
