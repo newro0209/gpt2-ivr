@@ -315,7 +315,7 @@ def setup_logging(log_level: str) -> logging.Logger:
     file_handler.setFormatter(logging.Formatter("%(asctime)s [%(levelname)s] [%(filename)s:%(lineno)d] %(message)s"))
     root_logger.addHandler(file_handler)
 
-    root_logger.info("로그 파일: %s", log_file)
+    root_logger.info("%s에 로그 파일 생성 완료", log_file)
     return logging.getLogger(LOGGER_NAME)
 
 
