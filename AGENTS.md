@@ -13,19 +13,102 @@
   - 임베딩: `artifacts/embeddings/`
   - 학습 체크포인트: `artifacts/training/`
 
-## 빌드, 테스트, 개발 명령어
+## 역할 분리 원칙
 
-- 환경 동기화는 `uv sync`를 사용한다.
-- 전체 파이프라인은 아래 순서로 실행한다.
-  - `uv run ivr analyze`
-  - `uv run ivr distill-tokenizer`
-  - `uv run ivr select`
-  - `uv run ivr remap`
-  - `uv run ivr align`
-  - `uv run ivr train`
-- `distill-tokenizer` 단계는 `remap` 이전에 반드시 수행한다.
-- 엔트리 포인트 실행은 개별 스크립트 직접 호출 대신 `uv run ivr <command>` 형식을 기본으로 사용한다.
-- `uv run ivr init`은 `artifacts/corpora/raw/` 아래의 `.txt`, `.jsonl`, `.json`을 일관된 `.txt`로 정제하여 `artifacts/corpora/cleaned/`에 저장합니다. `--text-key`, `--encoding`, `--raw-corpora-dir`, `--cleaned-corpora-dir`, `--normalize-force`로 정제 동작을 미세 조정할 수 있습니다.
+| 위치                         | 역할                                          |
+|------------------------------|----------------------------------------------|
+| `src/gpt2_ivr/cli.py`        | CLI 엔트리 포인트                               |
+| `src/gpt2_ivr/commands/`     | Command 패턴 구현 (파이프라인 오케스트레이션)         |
+| `src/gpt2_ivr/analysis/`     | 분석 로직 (Research Library)                   |
+| `src/gpt2_ivr/tokenizer/`    | 토크나이저 로직                                 |
+| `src/gpt2_ivr/embedding/`    | 임베딩 추출/재배치 로직                           |
+| `src/gpt2_ivr/training/`     | 학습 설정 및 실행 로직                            |
+| `artifacts/*`                | 토크나이저/분석/임베딩/학습 산출물                   |
+| `scripts/*`                  | 파이프라인 외 보조 유틸리티 스크립트                 |
+
+## 아키텍처 계층 구조
+
+이 프로젝트는 **Layered Architecture** 패턴을 따라 관심사를 명확히 분리합니다.
+
+### 1️⃣ 프레젠테이션 계층 (Presentation Layer)
+
+- **위치**: `cli.py`
+- **책임**: 사용자 인터페이스(CLI) 제공
+- **역할**:
+  - 사용자 입력을 받아 적절한 Command로 라우팅
+  - argparse 기반 명령행 인터페이스 제공
+  - 배너 출력 및 로깅 초기화
+
+### 2️⃣ 애플리케이션 계층 (Application Layer)
+
+- **위치**: `commands/`
+- **책임**: 명령 오케스트레이션 및 제어 흐름
+- **역할**:
+  - 도메인 로직을 조합하여 비즈니스 유스케이스 구현
+  - 입출력 경로 관리 및 파라미터 전달
+  - Command 패턴을 통한 실행 단위 캡슐화
+
+### 3️⃣ 도메인 계층 (Domain Layer)
+
+- **위치**: `analysis/`, `tokenizer/`, `embedding/`, `training/`
+- **책임**: 핵심 비즈니스 로직 및 알고리즘 구현
+- **역할**:
+  - CLI/Command와 독립적으로 재사용 가능한 로직
+  - 토큰 분석, 토크나이저 증류, 임베딩 처리, 모델 학습 등 핵심 기능
+  - 연구 및 실험의 핵심 자산
+
+### 횡단 관심사 처리
+
+로깅, 진행률 표시, 배너 같은 공통 기능은 `utils/`를 만들지 않고 `src/gpt2_ivr/cli.py`에서만 준비합니다. CLI가 Rich 콘솔 핸들러, ASCII 배너, 테이블/패널, 로그 파일 흐름을 직접 설정하고, `commands/`나 `analysis/`가 필요할 때 가져다 씁니다. 이 방식으로 별도의 계층 없이 공통 도구를 공유합니다.
+
+### 계층 간 의존성 규칙
+
+```text
+프레젠테이션 계층 (cli.py)
+        ↓
+애플리케이션 계층 (commands/)
+        ↓
+도메인 계층 (analysis/, tokenizer/, embedding/, training/)
+```
+
+- **단방향 의존성**: 상위 계층은 하위 계층에만 의존
+- **도메인 독립성**: 도메인 계층은 CLI/Command 계층을 알지 못함
+- **재사용성**: 각 계층은 독립적으로 테스트 및 재사용 가능
+
+## 중앙화된 경로 상수 관리
+
+모든 artifacts 경로는 `src/gpt2_ivr/constants.py`에서 중앙 관리됩니다.
+
+### 주요 경로 상수
+
+```python
+from gpt2_ivr.constants import (
+    # 코퍼스 경로
+    CORPORA_CLEANED_DIR,           # artifacts/corpora/cleaned
+    
+    # 토크나이저 경로
+    TOKENIZER_ORIGINAL_DIR,        # artifacts/tokenizers/original
+    TOKENIZER_DISTILLED_UNIGRAM_DIR,  # artifacts/tokenizers/distilled_unigram
+    TOKENIZER_REMAPPED_DIR,        # artifacts/tokenizers/remapped
+    
+    # 분석 산출물 경로
+    BPE_TOKEN_ID_SEQUENCES_FILE,   # artifacts/analysis/reports/bpe_token_id_sequences.txt
+    TOKEN_FREQUENCY_FILE,          # artifacts/analysis/reports/token_frequency.parquet
+    REPLACEMENT_CANDIDATES_FILE,   # artifacts/analysis/reports/replacement_candidates.csv
+    SELECTION_LOG_FILE,            # artifacts/analysis/reports/selection_log.md
+    
+    # 로그 및 학습 경로
+    LOGS_DIR,                      # artifacts/logs
+    TRAINING_CHECKPOINT_DIR,       # artifacts/training/sft_checkpoint
+)
+```
+
+### 장점
+
+- **일관성**: 모든 코드가 동일한 경로 상수를 참조
+- **유지보수성**: 경로 변경 시 한 곳만 수정
+- **가독성**: 경로의 의미가 명확한 상수명으로 표현
+- **타입 안전성**: Path 객체로 타입 체크 가능
 
 ## 코딩 스타일 및 네이밍 규칙
 
@@ -66,7 +149,7 @@
   - 이모지 및 장식 문자 사용 금지
   - "~를 시작합니다", "~했습니다" 등 장황한 표현 지양
   - "~ 시작", "~ 완료" 형태로 간결하게 작성
-  - 들여쓰기 장식(`└─`, `  ├─` 등) 사용 금지
+  - 들여쓰기 장식(`└─`, `├─` 등) 사용 금지
   - 중요한 단계 전환 또는 에러/경고만 로깅
 
 #### 어플리케이션 레이어 (commands/)
@@ -114,6 +197,7 @@ console.print(panel)
 - **Google 스타일 docstring**을 사용한다.
 - Docstring은 **한국어**로 작성한다.
 - 구조:
+
   ```python
   def example_function(param1: str, param2: int) -> bool:
       """함수의 목적을 한 줄로 요약한다.
@@ -134,6 +218,7 @@ console.print(panel)
           제너레이터의 경우 yield 값 설명
       """
   ```
+
 - 한 줄 요약은 마침표로 끝낸다.
 - 타입 정보는 타입 힌트에 이미 있으므로 docstring에 중복 작성하지 않는다.
 - TypedDict와 dataclass에는 Attributes 섹션을 추가한다.
