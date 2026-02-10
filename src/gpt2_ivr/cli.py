@@ -302,22 +302,11 @@ def setup_logging(log_level: str) -> logging.Logger:
     return logging.getLogger(LOGGER_NAME)
 
 
-def print_banner(command: str) -> None:
-    """시작 배너를 출력한다.
-
-    Args:
-        command: 실행할 커맨드 이름
-    """
+def print_banner() -> None:
+    """시작 배너를 출력한다."""
     figlet = Figlet(font="standard")
-    banner = figlet.renderText("GPT2-IVR").rstrip()
-    CONSOLE.print(
-        Panel.fit(
-            Text(banner, style="bold cyan"),
-            title="Tokenizer Model Migration + IVR",
-            subtitle=f"실행 명령어: {command}",
-            border_style="cyan",
-        )
-    )
+    banner = figlet.renderText("IVR").rstrip()
+    CONSOLE.print(Text(banner, style="bold cyan"))
 
 
 def create_command(args: argparse.Namespace) -> Command:
@@ -476,11 +465,11 @@ def main() -> int:
     Returns:
         종료 코드 (0: 성공, 1: 오류, 130: 사용자 중단)
     """
+    print_banner()
     parser = setup_parser()
     args = parser.parse_args()
 
     logger = setup_logging(args.log_level)
-    print_banner(args.command)
 
     start = perf_counter()
 
