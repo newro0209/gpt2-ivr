@@ -9,12 +9,13 @@ from __future__ import annotations
 import argparse
 import logging
 from collections.abc import Callable
+from dataclasses import dataclass
 from datetime import datetime
+from functools import lru_cache, partial
 from pathlib import Path
 from time import perf_counter
 from typing import Any
 
-from pyfiglet import Figlet
 from rich.console import Console
 from rich.logging import RichHandler
 from rich.panel import Panel
@@ -50,30 +51,50 @@ REMAP_RULES_PATH = Path("src/gpt2_ivr/tokenizer/remap_rules.yaml")
 CONSOLE = Console(stderr=False)
 
 
-class CliHelpFormatter(argparse.ArgumentDefaultsHelpFormatter, argparse.RawTextHelpFormatter):
-    """CLI 도움말 포맷터.
+# Command registry for Factory pattern
+_COMMAND_REGISTRY: dict[str, Callable[[argparse.Namespace], Command]] = {}
 
-    ArgumentDefaultsHelpFormatter와 RawTextHelpFormatter를 결합하여
-    기본값 표시와 원시 텍스트 포맷을 동시에 지원한다.
-    """
+
+def register_command(name: str) -> Callable:
+    """커맨드 팩토리 함수를 레지스트리에 등록하는 데코레이터."""
+    def decorator(factory: Callable[[argparse.Namespace], Command]) -> Callable:
+        _COMMAND_REGISTRY[name] = factory
+        return factory
+    return decorator
+
+
+@dataclass
+class ArgConfig:
+    """공통 인자 설정을 담는 데이터클래스."""
+    flag: str
+    type: type = str
+    default: Any = None
+    help: str = ""
+    action: str | None = None
+    choices: list[str] | None = None
+
+
+# 공통 인자 설정 (데이터 기반)
+COMMON_ARG_CONFIGS = {
+    "tokenizer-dir": ArgConfig("--tokenizer-dir", Path, TOKENIZER_ORIGINAL_DIR, "원본 토크나이저 디렉토리"),
+    "original-tokenizer-dir": ArgConfig("--original-tokenizer-dir", Path, TOKENIZER_ORIGINAL_DIR, "원본 토크나이저 디렉토리"),
+    "distilled-tokenizer-dir": ArgConfig("--distilled-tokenizer-dir", Path, TOKENIZER_DISTILLED_UNIGRAM_DIR, "증류된 토크나이저 디렉토리"),
+    "remapped-tokenizer-dir": ArgConfig("--remapped-tokenizer-dir", Path, TOKENIZER_REMAPPED_DIR, "재할당 토크나이저 디렉토리"),
+    "remap-rules-path": ArgConfig("--remap-rules-path", Path, REMAP_RULES_PATH, "재할당 규칙 파일 경로"),
+}
+
+
+class CliHelpFormatter(argparse.ArgumentDefaultsHelpFormatter, argparse.RawTextHelpFormatter):
+    """CLI 도움말 포맷터 (기본값 표시 + 원시 텍스트 포맷 지원)."""
 
 
 class CliArgumentParser(argparse.ArgumentParser):
-    """오류 메시지를 Rich 스타일로 출력하는 argparse 파서.
-
-    인자 파싱 오류 발생 시 Rich Panel로 오류를 표시하여
-    사용자 경험을 개선한다.
-    """
+    """Rich 스타일 오류 메시지를 출력하는 argparse 파서."""
 
     def error(self, message: str) -> None:
-        """인자 파싱 오류를 Rich 패널로 출력한다.
-
-        Args:
-            message: 오류 메시지
-        """
         CONSOLE.print(
             Panel.fit(
-                f"[bold red]인자 오류[/bold red]\n{message}\n\n" f"[dim]도움말: uv run ivr --help[/dim]",
+                f"[bold red]인자 오류[/bold red]\n{message}\n\n[dim]도움말: uv run ivr --help[/dim]",
                 title="CLI 입력 오류",
                 border_style="red",
             )
@@ -82,72 +103,30 @@ class CliArgumentParser(argparse.ArgumentParser):
 
 
 def validate_int(value: str, minimum: int = 0) -> int:
-    """정수 값을 검증한다.
-
-    Args:
-        value: 파싱할 문자열 값
-        minimum: 허용되는 최소값
-
-    Returns:
-        파싱된 정수 값
-
-    Raises:
-        argparse.ArgumentTypeError: 값이 정수가 아니거나 최소값보다 작은 경우
-    """
+    """정수 값을 검증한다 (최소값 검사 포함)."""
     try:
-        parsed = int(value)
+        if (parsed := int(value)) < minimum:
+            raise argparse.ArgumentTypeError(f"{minimum} 이상의 정수만 허용됩니다.")
+        return parsed
     except ValueError as e:
         raise argparse.ArgumentTypeError("정수를 입력해야 합니다.") from e
 
-    if parsed < minimum:
-        raise argparse.ArgumentTypeError(f"{minimum} 이상의 정수만 허용됩니다.")
-    return parsed
 
-
-def non_negative_int(value: str) -> int:
-    """0 이상의 정수 인자를 파싱한다."""
-    return validate_int(value, minimum=0)
-
-
-def positive_int(value: str) -> int:
-    """1 이상의 정수 인자를 파싱한다."""
-    return validate_int(value, minimum=1)
+# Partial application으로 중복 제거
+non_negative_int = partial(validate_int, minimum=0)
+positive_int = partial(validate_int, minimum=1)
 
 
 def add_common_args(parser: argparse.ArgumentParser, *args: str) -> None:
-    """공통 인자를 파서에 추가한다.
-
-    Args:
-        parser: 인자를 추가할 파서
-        *args: 추가할 인자 이름들
-    """
-    arg_configs = {
-        "tokenizer-dir": (
-            "--tokenizer-dir",
-            {"type": Path, "default": TOKENIZER_ORIGINAL_DIR, "help": "원본 토크나이저 디렉토리"},
-        ),
-        "original-tokenizer-dir": (
-            "--original-tokenizer-dir",
-            {"type": Path, "default": TOKENIZER_ORIGINAL_DIR, "help": "원본 토크나이저 디렉토리"},
-        ),
-        "distilled-tokenizer-dir": (
-            "--distilled-tokenizer-dir",
-            {"type": Path, "default": TOKENIZER_DISTILLED_UNIGRAM_DIR, "help": "증류된 토크나이저 디렉토리"},
-        ),
-        "remapped-tokenizer-dir": (
-            "--remapped-tokenizer-dir",
-            {"type": Path, "default": TOKENIZER_REMAPPED_DIR, "help": "재할당 토크나이저 디렉토리"},
-        ),
-        "remap-rules-path": (
-            "--remap-rules-path",
-            {"type": Path, "default": REMAP_RULES_PATH, "help": "재할당 규칙 파일 경로"},
-        ),
-    }
-
+    """공통 인자를 파서에 추가한다 (데이터 기반)."""
     for arg in args:
-        if arg in arg_configs:
-            flag, kwargs = arg_configs[arg]
-            parser.add_argument(flag, **kwargs)
+        if config := COMMON_ARG_CONFIGS.get(arg):
+            kwargs = {"type": config.type, "default": config.default, "help": config.help}
+            if config.action:
+                kwargs["action"] = config.action
+            if config.choices:
+                kwargs["choices"] = config.choices
+            parser.add_argument(config.flag, **kwargs)
 
 
 def setup_subparsers(subparsers: argparse._SubParsersAction) -> None:
@@ -272,17 +251,9 @@ def setup_parser() -> argparse.ArgumentParser:
 
 
 def setup_logging(log_level: str) -> logging.Logger:
-    """로깅을 설정한다.
-
-    Args:
-        log_level: 로깅 레벨 문자열
-
-    Returns:
-        설정된 로거 객체
-    """
-    level = getattr(logging, log_level.upper(), logging.INFO)
+    """로깅을 설정한다 (Rich 콘솔 + 파일 핸들러)."""
     root_logger = logging.getLogger()
-    root_logger.setLevel(level)
+    root_logger.setLevel(getattr(logging, log_level.upper(), logging.INFO))
 
     # Rich 콘솔 핸들러
     console_handler = RichHandler(rich_tracebacks=True, markup=True, console=CONSOLE, show_time=False)
@@ -291,8 +262,7 @@ def setup_logging(log_level: str) -> logging.Logger:
 
     # 파일 핸들러
     LOGS_DIR.mkdir(parents=True, exist_ok=True)
-    timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
-    log_file = LOGS_DIR / f"ivr_{timestamp}.log"
+    log_file = LOGS_DIR / f"ivr_{datetime.now():%Y%m%d_%H%M%S}.log"
 
     file_handler = logging.FileHandler(log_file, encoding="utf-8")
     file_handler.setFormatter(logging.Formatter("%(asctime)s [%(levelname)s] [%(filename)s:%(lineno)d] %(message)s"))
@@ -302,134 +272,109 @@ def setup_logging(log_level: str) -> logging.Logger:
     return logging.getLogger(LOGGER_NAME)
 
 
+@lru_cache(maxsize=1)
+def _get_banner() -> str:
+    """배너 텍스트를 캐싱하여 반환 (런타임 최적화)."""
+    from pyfiglet import Figlet
+    return Figlet(font="standard").renderText("IVR").rstrip()
+
+
 def print_banner() -> None:
     """시작 배너를 출력한다."""
-    figlet = Figlet(font="standard")
-    banner = figlet.renderText("IVR").rstrip()
-    CONSOLE.print(Text(banner, style="bold cyan"))
+    CONSOLE.print(Text(_get_banner(), style="bold cyan"))
+
+
+# Command factory functions (Registry pattern)
+@register_command("init")
+def _create_init_command(a: argparse.Namespace) -> InitCommand:
+    return InitCommand(
+        a.model_name, a.tokenizer_dir, a.force, a.raw_corpora_dir,
+        a.cleaned_corpora_dir, a.text_key, a.encoding, a.normalize_force
+    )
+
+
+@register_command("analyze")
+def _create_analyze_command(a: argparse.Namespace) -> AnalyzeCommand:
+    return AnalyzeCommand(
+        a.input_dir, a.output_sequences, a.output_frequency,
+        a.tokenizer_dir, a.workers, a.chunk_size, a.max_texts, a.encoding
+    )
+
+
+@register_command("distill-tokenizer")
+def _create_distill_command(a: argparse.Namespace) -> DistillCommand:
+    return DistillCommand(a.original_tokenizer_dir, a.distilled_tokenizer_dir, a.corpus_dir)
+
+
+@register_command("select")
+def _create_select_command(a: argparse.Namespace) -> SelectCommand:
+    return SelectCommand(
+        a.frequency_path, a.sequences_path, a.output_csv, a.output_log,
+        a.tokenizer_dir, a.max_candidates, a.min_token_len
+    )
+
+
+@register_command("remap")
+def _create_remap_command(a: argparse.Namespace) -> RemapCommand:
+    return RemapCommand(
+        a.distilled_tokenizer_dir, a.remapped_tokenizer_dir,
+        a.remap_rules_path, a.replacement_candidates_path
+    )
+
+
+@register_command("align")
+def _create_align_command(a: argparse.Namespace) -> AlignCommand:
+    return AlignCommand(
+        a.model_name, a.original_tokenizer_dir, a.remapped_tokenizer_dir,
+        a.remap_rules_path, a.embeddings_output_dir, a.init_strategy
+    )
+
+
+@register_command("train")
+def _create_train_command(a: argparse.Namespace) -> TrainCommand:
+    return TrainCommand()
 
 
 def create_command(args: argparse.Namespace) -> Command:
-    """커맨드 객체를 생성한다.
+    """커맨드 객체를 생성한다 (Factory Registry pattern)."""
+    if factory := _COMMAND_REGISTRY.get(args.command):
+        return factory(args)
+    raise NotImplementedError(f"'{args.command}'는 유효하지 않은 커맨드입니다.")
 
-    Args:
-        args: 파싱된 커맨드라인 인자
 
-    Returns:
-        생성된 Command 객체
-
-    Raises:
-        NotImplementedError: 유효하지 않은 커맨드인 경우
-    """
-    command_map: dict[str, Callable[[argparse.Namespace], Command]] = {
-        "init": lambda a: InitCommand(
-            a.model_name,
-            a.tokenizer_dir,
-            a.force,
-            a.raw_corpora_dir,
-            a.cleaned_corpora_dir,
-            a.text_key,
-            a.encoding,
-            a.normalize_force,
-        ),
-        "analyze": lambda a: AnalyzeCommand(
-            a.input_dir,
-            a.output_sequences,
-            a.output_frequency,
-            a.tokenizer_dir,
-            a.workers,
-            a.chunk_size,
-            a.max_texts,
-            a.encoding,
-        ),
-        "distill-tokenizer": lambda a: DistillCommand(
-            a.original_tokenizer_dir, a.distilled_tokenizer_dir, a.corpus_dir
-        ),
-        "select": lambda a: SelectCommand(
-            a.frequency_path,
-            a.sequences_path,
-            a.output_csv,
-            a.output_log,
-            a.tokenizer_dir,
-            a.max_candidates,
-            a.min_token_len,
-        ),
-        "remap": lambda a: RemapCommand(
-            a.distilled_tokenizer_dir, a.remapped_tokenizer_dir, a.remap_rules_path, a.replacement_candidates_path
-        ),
-        "align": lambda a: AlignCommand(
-            a.model_name,
-            a.original_tokenizer_dir,
-            a.remapped_tokenizer_dir,
-            a.remap_rules_path,
-            a.embeddings_output_dir,
-            a.init_strategy,
-        ),
-        "train": lambda a: TrainCommand(),
-    }
-
-    factory = command_map.get(args.command)
-    if not factory:
-        raise NotImplementedError(f"'{args.command}'는 유효하지 않은 커맨드입니다.")
-
-    return factory(args)
+def format_time(elapsed: float) -> str:
+    """경과 시간을 사람이 읽기 쉬운 형태로 포맷팅 (ms/초/분:초)."""
+    if elapsed < 1:
+        return f"{elapsed*1000:.0f}ms"
+    if elapsed < 60:
+        return f"{elapsed:.2f}초"
+    minutes, seconds = divmod(elapsed, 60)
+    return f"{int(minutes)}분 {seconds:.1f}초"
 
 
 def format_value(value: Any) -> str:
-    """결과 값을 포맷팅한다.
-
-    Args:
-        value: 포맷팅할 값
-
-    Returns:
-        포맷팅된 문자열
-    """
-    if isinstance(value, Path):
-        formatted = str(value)
-    elif isinstance(value, dict):
-        formatted = f"dict({len(value)})"
-    elif isinstance(value, list):
-        formatted = f"list({len(value)})"
-    else:
-        formatted = str(value)
-
+    """결과 값을 포맷팅한다 (Path/dict/list 타입별 처리)."""
+    formatters = {
+        Path: str,
+        dict: lambda v: f"dict({len(v)})",
+        list: lambda v: f"list({len(v)})",
+    }
+    formatted = formatters.get(type(value), str)(value)
     return formatted[:117] + "..." if len(formatted) > 120 else formatted
 
 
 def create_result_table(command_name: str, elapsed: float, result: dict[str, Any]) -> Panel:
-    """실행 결과 테이블을 생성한다.
-
-    Args:
-        command_name: 커맨드 이름
-        elapsed: 경과 시간
-        result: 실행 결과 딕셔너리
-
-    Returns:
-        생성된 Rich Panel 객체
-    """
-    # 시간 포맷팅
-    if elapsed < 1:
-        time_str = f"{elapsed*1000:.0f}ms"
-    elif elapsed < 60:
-        time_str = f"{elapsed:.2f}초"
-    else:
-        minutes = int(elapsed // 60)
-        seconds = elapsed % 60
-        time_str = f"{minutes}분 {seconds:.1f}초"
-
-    # 결과 테이블 생성
+    """실행 결과 테이블을 생성한다."""
     table = Table(show_header=True, border_style="dim", padding=(0, 1))
     table.add_column("항목", style="bold cyan", width=25)
     table.add_column("값", style="yellow", justify="left")
 
-    table.add_row("⏱️  실행 시간", time_str)
+    table.add_row("⏱️  실행 시간", format_time(elapsed))
 
     for key, value in result.items():
-        # 키를 읽기 좋게 포맷팅
         formatted_key = key.replace("_", " ").title()
         table.add_row(f"   {formatted_key}", format_value(value))
 
-    # Panel로 감싸기
     return Panel(
         table,
         title=f"[bold green]✅ {command_name} 완료[/bold green]",
@@ -438,65 +383,40 @@ def create_result_table(command_name: str, elapsed: float, result: dict[str, Any
     )
 
 
-def handle_error(
-    error: Exception,
-    command: str,
-    elapsed: float,
-    logger: logging.Logger,
-) -> None:
-    """에러를 처리하고 출력한다.
+# Error categorization strategy (Strategy pattern)
+_ERROR_CATEGORIES = {
+    NotImplementedError: ("미구현 기능", "⚠️", "미구현/미지원 오류"),
+    FileNotFoundError: ("파일 없음", "📁", "파일 찾기 실패"),
+    ValueError: ("입력값 오류", "⚠️", "입력값 오류"),
+}
 
-    Args:
-        error: 발생한 예외
-        command: 실행 중이던 커맨드 이름
-        elapsed: 경과 시간
-        logger: 로거 객체
-    """
+
+def handle_error(error: Exception, command: str, elapsed: float, logger: logging.Logger) -> None:
+    """에러를 처리하고 출력한다 (Strategy pattern for error categorization)."""
     error_type = type(error).__name__
+    category, icon, log_msg = _ERROR_CATEGORIES.get(type(error), ("예기치 않은 오류", "❌", "실행 중 예기치 않은 오류 발생"))
 
-    # 에러 카테고리 분류
-    if isinstance(error, NotImplementedError):
-        logger.error("[%s] 미구현/미지원 오류: %s", command, error)
-        error_category = "미구현 기능"
-        error_icon = "⚠️"
-    elif isinstance(error, FileNotFoundError):
-        logger.error("[%s] 파일 찾기 실패: %s", command, error)
-        error_category = "파일 없음"
-        error_icon = "📁"
-    elif isinstance(error, ValueError):
-        logger.error("[%s] 입력값 오류: %s", command, error)
-        error_category = "입력값 오류"
-        error_icon = "⚠️"
+    # 로깅
+    if type(error) in _ERROR_CATEGORIES:
+        logger.error("[%s] %s: %s", command, log_msg, error)
     else:
-        logger.exception("[%s] 실행 중 예기치 않은 오류 발생", command)
-        error_category = "예기치 않은 오류"
-        error_icon = "❌"
-
-    # 시간 포맷팅
-    if elapsed < 1:
-        time_str = f"{elapsed*1000:.0f}ms"
-    else:
-        time_str = f"{elapsed:.2f}초"
+        logger.exception("[%s] %s", command, log_msg)
 
     # Rich 테이블로 에러 정보 구성
     error_table = Table(show_header=False, border_style="dim red", padding=(0, 1))
     error_table.add_column("항목", style="bold red", width=15)
     error_table.add_column("내용", style="white")
 
-    error_table.add_row("카테고리", f"{error_icon} {error_category}")
+    error_table.add_row("카테고리", f"{icon} {category}")
     error_table.add_row("오류 타입", error_type)
     error_table.add_row("메시지", str(error))
-    error_table.add_row("경과 시간", time_str)
+    error_table.add_row("경과 시간", format_time(elapsed))
 
     # Panel로 감싸서 출력
     CONSOLE.print()
     CONSOLE.print(
-        Panel(
-            error_table,
-            title=f"[bold red]❌ {command} 실행 실패[/bold red]",
-            border_style="red",
-            padding=(1, 2)
-        )
+        Panel(error_table, title=f"[bold red]❌ {command} 실행 실패[/bold red]",
+              border_style="red", padding=(1, 2))
     )
     CONSOLE.print()
 
@@ -510,20 +430,14 @@ def handle_error(
 
 
 def main() -> int:
-    """CLI 엔트리 포인트.
-
-    파이프라인 명령어를 파싱하고 실행한다. 각 단계별 명령어는
-    서브커맨드로 제공되며, Rich 기반 콘솔 출력과 파일 로깅을 지원한다.
+    """CLI 엔트리 포인트 (Rich 기반 콘솔 출력 + 파일 로깅 지원).
 
     Returns:
         종료 코드 (0: 성공, 1: 오류, 130: 사용자 중단)
     """
     print_banner()
-    parser = setup_parser()
-    args = parser.parse_args()
-
+    args = setup_parser().parse_args()
     logger = setup_logging(args.log_level)
-
     start = perf_counter()
 
     try:
@@ -535,7 +449,6 @@ def main() -> int:
 
         logger.info("[%s] 단계 완료 (%.2fs)", command_name, elapsed)
         CONSOLE.print(create_result_table(command_name, elapsed, result))
-
         return 0
 
     except KeyboardInterrupt:
