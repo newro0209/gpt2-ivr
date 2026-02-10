@@ -56,7 +56,14 @@ _COMMAND_REGISTRY: dict[str, Callable[[argparse.Namespace], Command]] = {}
 
 
 def register_command(name: str) -> Callable:
-    """커맨드 팩토리 함수를 레지스트리에 등록하는 데코레이터."""
+    """커맨드 팩토리 함수를 레지스트리에 등록하는 데코레이터.
+
+    Args:
+        name: 커맨드 이름 (CLI 서브커맨드 이름)
+
+    Returns:
+        데코레이터 함수
+    """
     def decorator(factory: Callable[[argparse.Namespace], Command]) -> Callable:
         _COMMAND_REGISTRY[name] = factory
         return factory
@@ -85,13 +92,26 @@ COMMON_ARG_CONFIGS = {
 
 
 class CliHelpFormatter(argparse.ArgumentDefaultsHelpFormatter, argparse.RawTextHelpFormatter):
-    """CLI 도움말 포맷터 (기본값 표시 + 원시 텍스트 포맷 지원)."""
+    """CLI 도움말 포맷터.
+
+    ArgumentDefaultsHelpFormatter와 RawTextHelpFormatter를 결합하여
+    기본값 표시와 원시 텍스트 포맷을 동시에 지원한다.
+    """
 
 
 class CliArgumentParser(argparse.ArgumentParser):
-    """Rich 스타일 오류 메시지를 출력하는 argparse 파서."""
+    """오류 메시지를 Rich 스타일로 출력하는 argparse 파서.
+
+    인자 파싱 오류 발생 시 Rich Panel로 오류를 표시하여
+    사용자 경험을 개선한다.
+    """
 
     def error(self, message: str) -> None:
+        """인자 파싱 오류를 Rich 패널로 출력한다.
+
+        Args:
+            message: 오류 메시지
+        """
         CONSOLE.print(
             Panel.fit(
                 f"[bold red]인자 오류[/bold red]\n{message}\n\n[dim]도움말: uv run ivr --help[/dim]",
@@ -103,7 +123,18 @@ class CliArgumentParser(argparse.ArgumentParser):
 
 
 def validate_int(value: str, minimum: int = 0) -> int:
-    """정수 값을 검증한다 (최소값 검사 포함)."""
+    """정수 값을 검증한다.
+
+    Args:
+        value: 파싱할 문자열 값
+        minimum: 허용되는 최소값 (기본값: 0)
+
+    Returns:
+        파싱된 정수 값
+
+    Raises:
+        argparse.ArgumentTypeError: 값이 정수가 아니거나 최소값보다 작은 경우
+    """
     try:
         if (parsed := int(value)) < minimum:
             raise argparse.ArgumentTypeError(f"{minimum} 이상의 정수만 허용됩니다.")
@@ -118,7 +149,14 @@ positive_int = partial(validate_int, minimum=1)
 
 
 def add_common_args(parser: argparse.ArgumentParser, *args: str) -> None:
-    """공통 인자를 파서에 추가한다 (데이터 기반)."""
+    """공통 인자를 파서에 추가한다.
+
+    COMMON_ARG_CONFIGS에서 설정을 조회하여 데이터 기반으로 인자를 추가한다.
+
+    Args:
+        parser: 인자를 추가할 파서
+        *args: 추가할 인자 이름들 (COMMON_ARG_CONFIGS의 키)
+    """
     for arg in args:
         if config := COMMON_ARG_CONFIGS.get(arg):
             kwargs = {"type": config.type, "default": config.default, "help": config.help}
@@ -251,7 +289,16 @@ def setup_parser() -> argparse.ArgumentParser:
 
 
 def setup_logging(log_level: str) -> logging.Logger:
-    """로깅을 설정한다 (Rich 콘솔 + 파일 핸들러)."""
+    """로깅을 설정한다.
+
+    Rich 콘솔 핸들러와 파일 핸들러를 모두 설정한다.
+
+    Args:
+        log_level: 로깅 레벨 문자열 (DEBUG, INFO, WARNING, ERROR)
+
+    Returns:
+        설정된 로거 객체
+    """
     root_logger = logging.getLogger()
     root_logger.setLevel(getattr(logging, log_level.upper(), logging.INFO))
 
@@ -274,7 +321,13 @@ def setup_logging(log_level: str) -> logging.Logger:
 
 @lru_cache(maxsize=1)
 def _get_banner() -> str:
-    """배너 텍스트를 캐싱하여 반환 (런타임 최적화)."""
+    """배너 텍스트를 캐싱하여 반환한다.
+
+    pyfiglet을 사용하여 ASCII 아트 배너를 생성하고, LRU 캐시로 재사용한다.
+
+    Returns:
+        생성된 배너 텍스트
+    """
     from pyfiglet import Figlet
     return Figlet(font="standard").renderText("IVR").rstrip()
 
@@ -287,6 +340,7 @@ def print_banner() -> None:
 # Command factory functions (Registry pattern)
 @register_command("init")
 def _create_init_command(a: argparse.Namespace) -> InitCommand:
+    """InitCommand 팩토리 함수."""
     return InitCommand(
         a.model_name, a.tokenizer_dir, a.force, a.raw_corpora_dir,
         a.cleaned_corpora_dir, a.text_key, a.encoding, a.normalize_force
@@ -295,6 +349,7 @@ def _create_init_command(a: argparse.Namespace) -> InitCommand:
 
 @register_command("analyze")
 def _create_analyze_command(a: argparse.Namespace) -> AnalyzeCommand:
+    """AnalyzeCommand 팩토리 함수."""
     return AnalyzeCommand(
         a.input_dir, a.output_sequences, a.output_frequency,
         a.tokenizer_dir, a.workers, a.chunk_size, a.max_texts, a.encoding
@@ -303,11 +358,13 @@ def _create_analyze_command(a: argparse.Namespace) -> AnalyzeCommand:
 
 @register_command("distill-tokenizer")
 def _create_distill_command(a: argparse.Namespace) -> DistillCommand:
+    """DistillCommand 팩토리 함수."""
     return DistillCommand(a.original_tokenizer_dir, a.distilled_tokenizer_dir, a.corpus_dir)
 
 
 @register_command("select")
 def _create_select_command(a: argparse.Namespace) -> SelectCommand:
+    """SelectCommand 팩토리 함수."""
     return SelectCommand(
         a.frequency_path, a.sequences_path, a.output_csv, a.output_log,
         a.tokenizer_dir, a.max_candidates, a.min_token_len
@@ -316,6 +373,7 @@ def _create_select_command(a: argparse.Namespace) -> SelectCommand:
 
 @register_command("remap")
 def _create_remap_command(a: argparse.Namespace) -> RemapCommand:
+    """RemapCommand 팩토리 함수."""
     return RemapCommand(
         a.distilled_tokenizer_dir, a.remapped_tokenizer_dir,
         a.remap_rules_path, a.replacement_candidates_path
@@ -324,6 +382,7 @@ def _create_remap_command(a: argparse.Namespace) -> RemapCommand:
 
 @register_command("align")
 def _create_align_command(a: argparse.Namespace) -> AlignCommand:
+    """AlignCommand 팩토리 함수."""
     return AlignCommand(
         a.model_name, a.original_tokenizer_dir, a.remapped_tokenizer_dir,
         a.remap_rules_path, a.embeddings_output_dir, a.init_strategy
@@ -332,18 +391,40 @@ def _create_align_command(a: argparse.Namespace) -> AlignCommand:
 
 @register_command("train")
 def _create_train_command(a: argparse.Namespace) -> TrainCommand:
+    """TrainCommand 팩토리 함수."""
     return TrainCommand()
 
 
 def create_command(args: argparse.Namespace) -> Command:
-    """커맨드 객체를 생성한다 (Factory Registry pattern)."""
+    """커맨드 객체를 생성한다.
+
+    Factory Registry 패턴을 사용하여 커맨드 이름에 해당하는 팩토리 함수를 조회하고 실행한다.
+
+    Args:
+        args: 파싱된 커맨드라인 인자
+
+    Returns:
+        생성된 Command 객체
+
+    Raises:
+        NotImplementedError: 유효하지 않은 커맨드인 경우
+    """
     if factory := _COMMAND_REGISTRY.get(args.command):
         return factory(args)
     raise NotImplementedError(f"'{args.command}'는 유효하지 않은 커맨드입니다.")
 
 
 def format_time(elapsed: float) -> str:
-    """경과 시간을 사람이 읽기 쉬운 형태로 포맷팅 (ms/초/분:초)."""
+    """경과 시간을 사람이 읽기 쉬운 형태로 포맷팅한다.
+
+    1초 미만은 밀리초, 1분 미만은 초, 그 이상은 분:초 형식으로 표시한다.
+
+    Args:
+        elapsed: 경과 시간 (초 단위)
+
+    Returns:
+        포맷팅된 시간 문자열 (예: "500ms", "3.14초", "2분 30.5초")
+    """
     if elapsed < 1:
         return f"{elapsed*1000:.0f}ms"
     if elapsed < 60:
@@ -353,7 +434,16 @@ def format_time(elapsed: float) -> str:
 
 
 def format_value(value: Any) -> str:
-    """결과 값을 포맷팅한다 (Path/dict/list 타입별 처리)."""
+    """결과 값을 포맷팅한다.
+
+    타입별로 적절한 포맷터를 적용하고, 120자를 초과하면 잘라낸다.
+
+    Args:
+        value: 포맷팅할 값 (Any 타입)
+
+    Returns:
+        포맷팅된 문자열 (120자 초과 시 "..." 추가)
+    """
     formatters = {
         Path: str,
         dict: lambda v: f"dict({len(v)})",
@@ -364,7 +454,16 @@ def format_value(value: Any) -> str:
 
 
 def create_result_table(command_name: str, elapsed: float, result: dict[str, Any]) -> Panel:
-    """실행 결과 테이블을 생성한다."""
+    """실행 결과 테이블을 생성한다.
+
+    Args:
+        command_name: 커맨드 이름
+        elapsed: 경과 시간 (초 단위)
+        result: 실행 결과 딕셔너리
+
+    Returns:
+        생성된 Rich Panel 객체
+    """
     table = Table(show_header=True, border_style="dim", padding=(0, 1))
     table.add_column("항목", style="bold cyan", width=25)
     table.add_column("값", style="yellow", justify="left")
@@ -392,7 +491,16 @@ _ERROR_CATEGORIES = {
 
 
 def handle_error(error: Exception, command: str, elapsed: float, logger: logging.Logger) -> None:
-    """에러를 처리하고 출력한다 (Strategy pattern for error categorization)."""
+    """에러를 처리하고 출력한다.
+
+    Strategy 패턴을 사용하여 에러 타입별로 적절한 카테고리와 아이콘을 선택한다.
+
+    Args:
+        error: 발생한 예외
+        command: 실행 중이던 커맨드 이름
+        elapsed: 경과 시간 (초 단위)
+        logger: 로거 객체
+    """
     error_type = type(error).__name__
     category, icon, log_msg = _ERROR_CATEGORIES.get(type(error), ("예기치 않은 오류", "❌", "실행 중 예기치 않은 오류 발생"))
 
@@ -430,7 +538,10 @@ def handle_error(error: Exception, command: str, elapsed: float, logger: logging
 
 
 def main() -> int:
-    """CLI 엔트리 포인트 (Rich 기반 콘솔 출력 + 파일 로깅 지원).
+    """CLI 엔트리 포인트.
+
+    파이프라인 명령어를 파싱하고 실행한다. 각 단계별 명령어는
+    서브커맨드로 제공되며, Rich 기반 콘솔 출력과 파일 로깅을 지원한다.
 
     Returns:
         종료 코드 (0: 성공, 1: 오류, 130: 사용자 중단)
