@@ -396,7 +396,7 @@ def format_value(value: Any) -> str:
     return formatted[:117] + "..." if len(formatted) > 120 else formatted
 
 
-def create_result_table(command_name: str, elapsed: float, result: dict[str, Any]) -> Table:
+def create_result_table(command_name: str, elapsed: float, result: dict[str, Any]) -> Panel:
     """실행 결과 테이블을 생성한다.
 
     Args:
@@ -405,21 +405,37 @@ def create_result_table(command_name: str, elapsed: float, result: dict[str, Any
         result: 실행 결과 딕셔너리
 
     Returns:
-        생성된 Rich Table 객체
+        생성된 Rich Panel 객체
     """
-    table = Table(
-        title=f"✅ {command_name} 단계 완료",
-        show_header=False,
-        border_style="green",
-    )
-    table.add_column("항목", style="bold")
-    table.add_column("값")
-    table.add_row("실행 시간", f"{elapsed:.2f}초")
+    # 시간 포맷팅
+    if elapsed < 1:
+        time_str = f"{elapsed*1000:.0f}ms"
+    elif elapsed < 60:
+        time_str = f"{elapsed:.2f}초"
+    else:
+        minutes = int(elapsed // 60)
+        seconds = elapsed % 60
+        time_str = f"{minutes}분 {seconds:.1f}초"
+
+    # 결과 테이블 생성
+    table = Table(show_header=True, border_style="dim", padding=(0, 1))
+    table.add_column("항목", style="bold cyan", width=25)
+    table.add_column("값", style="yellow", justify="left")
+
+    table.add_row("⏱️  실행 시간", time_str)
 
     for key, value in result.items():
-        table.add_row(str(key), format_value(value))
+        # 키를 읽기 좋게 포맷팅
+        formatted_key = key.replace("_", " ").title()
+        table.add_row(f"   {formatted_key}", format_value(value))
 
-    return table
+    # Panel로 감싸기
+    return Panel(
+        table,
+        title=f"[bold green]✅ {command_name} 완료[/bold green]",
+        border_style="green",
+        padding=(1, 2)
+    )
 
 
 def handle_error(
@@ -438,22 +454,59 @@ def handle_error(
     """
     error_type = type(error).__name__
 
+    # 에러 카테고리 분류
     if isinstance(error, NotImplementedError):
         logger.error("[%s] 미구현/미지원 오류: %s", command, error)
-    elif isinstance(error, (FileNotFoundError, ValueError)):
-        logger.error("[%s] 입력 검증 오류: %s", command, error)
+        error_category = "미구현 기능"
+        error_icon = "⚠️"
+    elif isinstance(error, FileNotFoundError):
+        logger.error("[%s] 파일 찾기 실패: %s", command, error)
+        error_category = "파일 없음"
+        error_icon = "📁"
+    elif isinstance(error, ValueError):
+        logger.error("[%s] 입력값 오류: %s", command, error)
+        error_category = "입력값 오류"
+        error_icon = "⚠️"
     else:
         logger.exception("[%s] 실행 중 예기치 않은 오류 발생", command)
+        error_category = "예기치 않은 오류"
+        error_icon = "❌"
 
+    # 시간 포맷팅
+    if elapsed < 1:
+        time_str = f"{elapsed*1000:.0f}ms"
+    else:
+        time_str = f"{elapsed:.2f}초"
+
+    # Rich 테이블로 에러 정보 구성
+    error_table = Table(show_header=False, border_style="dim red", padding=(0, 1))
+    error_table.add_column("항목", style="bold red", width=15)
+    error_table.add_column("내용", style="white")
+
+    error_table.add_row("카테고리", f"{error_icon} {error_category}")
+    error_table.add_row("오류 타입", error_type)
+    error_table.add_row("메시지", str(error))
+    error_table.add_row("경과 시간", time_str)
+
+    # Panel로 감싸서 출력
+    CONSOLE.print()
     CONSOLE.print(
-        Panel.fit(
-            f"[bold red]{command} 단계 실행 실패[/bold red]\n"
-            f"{error_type}: {error}\n"
-            f"[dim]경과 시간: {elapsed:.2f}초[/dim]",
-            title="실행 오류",
+        Panel(
+            error_table,
+            title=f"[bold red]❌ {command} 실행 실패[/bold red]",
             border_style="red",
+            padding=(1, 2)
         )
     )
+    CONSOLE.print()
+
+    # 도움말 제안
+    help_text = Text()
+    help_text.append("💡 도움말: ", style="bold yellow")
+    help_text.append(f"ivr {command} --help", style="cyan")
+    help_text.append(" 명령으로 상세 옵션을 확인하세요", style="dim")
+    CONSOLE.print(help_text)
+    CONSOLE.print()
 
 
 def main() -> int:

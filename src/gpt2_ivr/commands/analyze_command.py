@@ -102,18 +102,39 @@ class AnalyzeCommand(Command):
         total_tokens = sum(counter.values())
         unique_tokens = len(counter)
 
-        # Rich 테이블로 결과 출력
-        table = Table(title="토큰 빈도 분석 결과", show_header=False, title_style="bold green")
-        table.add_column("항목", style="cyan", width=20)
-        table.add_column("값", style="yellow")
+        # 추가 통계 계산
+        top_10 = sorted(counter.items(), key=lambda x: -x[1])[:10]
+        avg_frequency = total_tokens / unique_tokens if unique_tokens > 0 else 0
 
-        table.add_row("총 토큰", f"{total_tokens:,}개")
-        table.add_row("고유 토큰", f"{unique_tokens:,}개")
-        table.add_row("빈도 파일", str(self.output_frequency))
-        table.add_row("시퀀스 파일", str(self.output_sequences))
+        # Rich 테이블로 결과 출력
+        table = Table(title="✨ 토큰 빈도 분석 결과", show_header=True, title_style="bold green")
+        table.add_column("항목", style="bold cyan", width=20)
+        table.add_column("값", style="yellow", justify="right")
+
+        table.add_row("총 토큰 수", f"{total_tokens:,}개")
+        table.add_row("고유 토큰 수", f"{unique_tokens:,}개")
+        table.add_row("평균 빈도", f"{avg_frequency:.2f}회")
+        table.add_row("", "")  # 빈 줄
+        table.add_row("빈도 파일", str(self.output_frequency.name))
+        table.add_row("시퀀스 파일", str(self.output_sequences.name))
 
         console.print()
         console.print(table)
+
+        # 상위 10개 토큰 표시
+        if top_10:
+            top_table = Table(title="🏆 상위 10개 빈도 토큰", show_header=True, border_style="dim")
+            top_table.add_column("순위", style="dim", width=6, justify="center")
+            top_table.add_column("토큰 ID", style="cyan", width=10, justify="right")
+            top_table.add_column("빈도", style="yellow", width=15, justify="right")
+
+            for idx, (token_id, freq) in enumerate(top_10, 1):
+                rank_style = "bold green" if idx <= 3 else "dim"
+                top_table.add_row(f"{idx}", f"{token_id}", f"{freq:,}회", style=rank_style)
+
+            console.print()
+            console.print(top_table)
+
         console.print()
 
         return {
