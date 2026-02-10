@@ -72,10 +72,10 @@ class RemapCommand(Command):
                 f"{self.distilled_tokenizer_path}"
             )
 
-        self.logger.info("증류 토크나이저 로드: %s", self.distilled_tokenizer_path)
         tokenizer = Tokenizer.from_file(
             str(self.distilled_tokenizer_path / "tokenizer.json")
         )
+        self.logger.info("%s에서 증류 토크나이저 로드 완료", self.distilled_tokenizer_path)
 
         # 2. 교체 후보 로드 (선택, 로그 정보용)
         if self.replacement_candidates_path.exists():
@@ -88,7 +88,7 @@ class RemapCommand(Command):
             # self.logger.debug("교체 후보 샘플:\n%s", candidates_df.head())
         else:
             self.logger.warning(
-                "교체 후보 CSV가 없어 상세 로그를 생략합니다: %s",
+                "교체 후보 CSV 없음: %s",
                 self.replacement_candidates_path,
             )
 
@@ -103,7 +103,7 @@ class RemapCommand(Command):
 
         if loaded_rules is None:
             self.logger.warning(
-                "재할당 규칙이 비어 있습니다: %s", self.remap_rules_path
+                "재할당 규칙 비어 있음: %s", self.remap_rules_path
             )
             remap_rules: dict[str, str] = {}
         elif isinstance(loaded_rules, dict):
@@ -166,7 +166,7 @@ class RemapCommand(Command):
                 )
 
         if new_tokens_to_add:
-            self.logger.info("신규 토큰 %d개를 추가합니다.", len(new_tokens_to_add))
+            self.logger.info("신규 토큰 %d개 추가", len(new_tokens_to_add))
             # 중복 제거 후 신규 토큰 추가
             tokenizer.add_tokens(list(set(new_tokens_to_add)))
             self.logger.info(
@@ -174,7 +174,7 @@ class RemapCommand(Command):
                 tokenizer.get_vocab_size(),
             )
         else:
-            self.logger.info("추가할 신규 토큰이 없습니다.")
+            self.logger.info("추가할 신규 토큰 없음")
 
         # 5. 재할당 토크나이저 저장
         self.remapped_tokenizer_path.mkdir(parents=True, exist_ok=True)

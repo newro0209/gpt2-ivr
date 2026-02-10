@@ -441,9 +441,8 @@ def select_replacement_candidates(
         raise FileNotFoundError(f"토큰 시퀀스 파일이 없습니다: {sequences_path}")
 
     # 1) 빈도 로드
-    logger.info("토큰 빈도 로드: %s", frequency_path)
     freq = load_frequency(frequency_path)
-    logger.info("빈도 데이터 로드 완료 (고유 토큰 %d개)", len(freq))
+    logger.info("%s에서 토큰 빈도 로드 완료 (고유 토큰 %d개)", frequency_path, len(freq))
 
     # 2) 토크나이저 로드
     tokenizer_files = list(tokenizer_dir.glob("*")) if tokenizer_dir.exists() else []
@@ -454,15 +453,15 @@ def select_replacement_candidates(
     if not has_tokenizer_files:
         raise FileNotFoundError(f"원본 토크나이저 파일이 없습니다: {tokenizer_dir}")
 
-    logger.info("토크나이저 로드: %s", tokenizer_dir)
     tokenizer = GPT2Tokenizer.from_pretrained(str(tokenizer_dir))
+    logger.info("%s에서 토크나이저 로드 완료", tokenizer_dir)
 
     # 3) 보호 토큰 집합 구성
     protected_ids = get_protected_token_ids(tokenizer, min_token_len)
     logger.info("보호 토큰 %d개 설정", len(protected_ids))
 
     # 4) 희생 후보 선정
-    logger.info("희생 후보 선정 중 (최대 %d개)", max_candidates)
+    logger.info("희생 후보 선정 시작 (최대 %d개)", max_candidates)
     sacrifices = select_sacrifice_candidates(
         freq, tokenizer, protected_ids, max_candidates
     )
@@ -472,11 +471,11 @@ def select_replacement_candidates(
         logger.info("미출현(빈도 0) 토큰: %d개", zero_freq_count)
 
     # 5) 바이그램 집계
-    logger.info("바이그램 집계 중")
+    logger.info("바이그램 집계 시작")
     bigram_counts = count_bigrams(sequences_path, logger)
 
     # 6) 신규 토큰 후보 탐색
-    logger.info("신규 토큰 후보 탐색 중 (최대 %d개)", max_candidates)
+    logger.info("신규 토큰 후보 탐색 시작 (최대 %d개)", max_candidates)
     new_tokens = discover_new_token_candidates(
         bigram_counts, tokenizer, max_candidates, logger
     )

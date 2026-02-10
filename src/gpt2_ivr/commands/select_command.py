@@ -99,19 +99,43 @@ class SelectCommand(Command):
         )
 
         # Rich 테이블로 결과 출력
-        table = Table(title="교체 후보 선정 결과", show_header=False, title_style="bold green")
-        table.add_column("항목", style="cyan", width=20)
-        table.add_column("값", style="yellow")
+        table = Table(title="🎯 교체 후보 선정 결과", show_header=True, title_style="bold green")
+        table.add_column("항목", style="bold cyan", width=20)
+        table.add_column("값", style="yellow", justify="right")
 
         table.add_row("교체 후보 쌍", f"{len(pairs):,}개")
         table.add_row("희생 후보", f"{len(sacrifices):,}개")
         table.add_row("신규 토큰 후보", f"{len(new_tokens_list):,}개")
         table.add_row("고유 바이그램", f"{len(bigram_counts):,}개")
+        table.add_row("", "")  # 빈 줄
         table.add_row("CSV 파일", str(self.output_csv))
         table.add_row("로그 파일", str(self.output_log))
 
         console.print()
         console.print(table)
+
+        # 샘플 교체 후보 표시 (상위 5개)
+        if pairs:
+            sample_table = Table(title="📋 교체 후보 샘플 (상위 5개)", show_header=True, border_style="dim")
+            sample_table.add_column("희생 토큰 ID", style="red", width=15, justify="center")
+            sample_table.add_column("→", style="dim", width=3, justify="center")
+            sample_table.add_column("신규 토큰", style="green", width=30)
+            sample_table.add_column("빈도", style="yellow", width=12, justify="right")
+
+            for pair in pairs[:5]:
+                sacrifice_id = pair.sacrifice.token_id
+                new_token = pair.new_token.merged_str
+                frequency = pair.new_token.bigram_freq
+                sample_table.add_row(
+                    f"{sacrifice_id}",
+                    "→",
+                    f"{new_token}",
+                    f"{frequency:,}회"
+                )
+
+            console.print()
+            console.print(sample_table)
+
         console.print()
 
         return {

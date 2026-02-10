@@ -45,7 +45,7 @@ def _extract_texts_from_file(path: Path, text_key: str, encoding: str) -> Iterat
                     record = json.loads(line)
                 except json.JSONDecodeError as exc:
                     logger.warning(
-                        "%s 파일의 jsonl 라인을 해석할 수 없습니다: %s", path, exc
+                        "%s 파일의 jsonl 라인 해석 실패: %s", path, exc
                     )
                     continue
                 if isinstance(record, dict) and text_key in record:
@@ -61,7 +61,7 @@ def _extract_texts_from_file(path: Path, text_key: str, encoding: str) -> Iterat
             with path.open("r", encoding=encoding) as handle:
                 payload = json.load(handle)
         except json.JSONDecodeError as exc:
-            logger.warning("%s 파일을 json으로 파싱할 수 없습니다: %s", path, exc)
+            logger.warning("%s 파일 json 파싱 실패: %s", path, exc)
             return
         if isinstance(payload, list):
             for record in payload:
@@ -88,7 +88,7 @@ def normalize_raw_corpora(
     """raw 디렉토리의 파일을 정제된 텍스트(.txt)로 변환합니다."""
     raw_files = _collect_raw_files(raw_dir)
     if not raw_files:
-        logger.warning("raw 코퍼스 파일을 찾을 수 없습니다: %s", raw_dir)
+        logger.warning("raw 코퍼스 파일 없음: %s", raw_dir)
         return []
 
     cleaned_dir.mkdir(parents=True, exist_ok=True)
@@ -103,7 +103,7 @@ def normalize_raw_corpora(
             raw_mtime = raw_path.stat().st_mtime
             cleaned_mtime = cleaned_path.stat().st_mtime
             if raw_mtime <= cleaned_mtime:
-                logger.debug("정제본이 최신입니다: %s", cleaned_path)
+                logger.debug("정제본 최신 상태: %s", cleaned_path)
                 continue
 
         line_count = 0
@@ -116,7 +116,7 @@ def normalize_raw_corpora(
         if line_count == 0:
             cleaned_path.unlink(missing_ok=True)
             logger.warning(
-                "%s에서 텍스트를 추출하지 못했습니다. 정제본을 제거합니다.", raw_path
+                "%s에서 텍스트 추출 실패, 정제본 제거", raw_path
             )
             continue
 
@@ -125,11 +125,11 @@ def normalize_raw_corpora(
 
     if normalized_paths:
         logger.info(
-            "총 %d개의 코퍼스를 정제하여 '%s'에 저장했습니다.",
+            "코퍼스 %d개 정제 완료, %s에 저장",
             len(normalized_paths),
             cleaned_dir,
         )
     else:
-        logger.warning("변환된 정제본이 없습니다.")
+        logger.warning("변환된 정제본 없음")
 
     return normalized_paths
