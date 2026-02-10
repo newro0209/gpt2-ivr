@@ -50,13 +50,13 @@ def get_training_corpus(
     files = list(corpus_dir.glob("*.txt"))
     if not files:
         logger.warning(
-            "경고: %s 디렉토리에 텍스트 파일이 없습니다. 토크나이저 학습을 진행할 수 없습니다.",
+            "%s 디렉토리에 텍스트 파일 없음",
             corpus_dir,
         )
         yield []
         return
 
-    logger.info("코퍼스 파일 %d개 로드 중: %s", len(files), corpus_dir)
+    logger.info("코퍼스 파일 %d개 로드: %s", len(files), corpus_dir)
     batch: list[str] = []
     for file_path in files:
         with open(file_path, "r", encoding="utf-8") as f:

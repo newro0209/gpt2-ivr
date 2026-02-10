@@ -135,7 +135,7 @@ def initialize_new_token_embeddings(
 
         logger.info("신규 토큰 임베딩 %d개 초기화 완료", len(new_tokens))
     else:
-        logger.info("초기화할 신규 토큰이 없습니다")
+        logger.info("초기화할 신규 토큰 없음")
 
     # 6. 출력 디렉토리 생성 및 저장
     output_dir.mkdir(parents=True, exist_ok=True)

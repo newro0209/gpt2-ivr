@@ -89,7 +89,7 @@ class AnalyzeCommand(Command):
         counter: Counter[int] = Counter()
         self.output_sequences.parent.mkdir(parents=True, exist_ok=True)
         with self.output_sequences.open("w", encoding="utf-8") as handle:
-            for chunk_ids in track(encoded_chunks_iterator, description="🔍 토큰화"):
+            for chunk_ids in track(encoded_chunks_iterator, description="토큰화 중"):
                 for token_ids in chunk_ids:
                     counter.update(token_ids)
                     handle.write(" ".join(str(token_id) for token_id in token_ids))

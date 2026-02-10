@@ -183,8 +183,8 @@ def analyze_token_frequency(
     if not has_tokenizer_files:
         raise FileNotFoundError(f"원본 토크나이저 파일이 없습니다: {tokenizer_dir}")
 
-    logger.info("토크나이저 로드: %s", tokenizer_dir)
     tokenizer = GPT2Tokenizer.from_pretrained(str(tokenizer_dir))
+    logger.info("%s에서 토크나이저 로드 완료", tokenizer_dir)
 
     # 4) 병렬 처리 파라미터 계산
     if workers <= 0:

@@ -298,7 +298,7 @@ def setup_logging(log_level: str) -> logging.Logger:
     file_handler.setFormatter(logging.Formatter("%(asctime)s [%(levelname)s] [%(filename)s:%(lineno)d] %(message)s"))
     root_logger.addHandler(file_handler)
 
-    root_logger.info("📝 로그 파일: %s", log_file)
+    root_logger.info("로그 파일: %s", log_file)
     return logging.getLogger(LOGGER_NAME)
 
 
@@ -443,7 +443,7 @@ def handle_error(
     elif isinstance(error, (FileNotFoundError, ValueError)):
         logger.error("[%s] 입력 검증 오류: %s", command, error)
     else:
-        logger.exception("[%s] 실행 중 예기치 않은 오류가 발생했습니다.", command)
+        logger.exception("[%s] 실행 중 예기치 않은 오류 발생", command)
 
     CONSOLE.print(
         Panel.fit(
@@ -476,17 +476,17 @@ def main() -> int:
     try:
         command = create_command(args)
         command_name = command.get_name()
-        logger.info("🚀 [%s] 단계를 시작합니다.", command_name)
+        logger.info("[%s] 단계 시작", command_name)
         result = command.execute()
         elapsed = perf_counter() - start
 
-        logger.info("✅ [%s] 단계가 완료되었습니다. (%.2fs)", command_name, elapsed)
+        logger.info("[%s] 단계 완료 (%.2fs)", command_name, elapsed)
         CONSOLE.print(create_result_table(command_name, elapsed, result))
 
         return 0
 
     except KeyboardInterrupt:
-        logger.warning("⏹️ 사용자 요청으로 실행이 중단되었습니다.")
+        logger.warning("사용자 요청으로 실행 중단됨")
         return 130
 
     except Exception as e:
