@@ -80,6 +80,8 @@ class SelectCommand(Command):
         ) = select_replacement_candidates(
             frequency_path=self.frequency_path,
             sequences_path=self.sequences_path,
+            output_csv=self.output_csv,
+            output_log=self.output_log,
             tokenizer_dir=self.tokenizer_dir,
             max_candidates=self.max_candidates,
             min_token_len=self.min_token_len,
