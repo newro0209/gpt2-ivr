@@ -275,3 +275,6 @@ artifacts/
 # Legacy paths (이전 구조 호환성)
 corpora/
 analysis/reports/
+
+# Claude
+!.claude/settings.local.json
