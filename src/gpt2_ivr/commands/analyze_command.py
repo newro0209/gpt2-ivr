@@ -103,7 +103,7 @@ class AnalyzeCommand(Command):
         unique_tokens = len(counter)
 
         # 추가 통계 계산
-        top_10 = sorted(counter.items(), key=lambda x: -x[1])[:10]
+        top_10 = counter.most_common(10)
         avg_frequency = total_tokens / unique_tokens if unique_tokens > 0 else 0
 
         # Rich 테이블로 결과 출력

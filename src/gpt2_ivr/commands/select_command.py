@@ -123,9 +123,9 @@ class SelectCommand(Command):
             sample_table.add_column("빈도", style="yellow", width=12, justify="right")
 
             for idx, pair in enumerate(pairs[:5], 1):
-                sacrifice_id = pair.get("sacrifice_id", "N/A")
-                new_token = pair.get("new_token", "N/A")
-                frequency = pair.get("frequency", 0)
+                sacrifice_id = pair.sacrifice.token_id
+                new_token = pair.new_token.merged_str
+                frequency = pair.new_token.bigram_freq
                 sample_table.add_row(
                     f"{sacrifice_id}",
                     "→",
