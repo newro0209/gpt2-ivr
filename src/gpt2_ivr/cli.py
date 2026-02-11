@@ -48,7 +48,7 @@ from gpt2_ivr.constants import (
 
 LOGGER_NAME = "gpt2_ivr.cli"
 REMAP_RULES_PATH = Path("src/gpt2_ivr/tokenizer/remap_rules.yaml")
-CONSOLE = Console(stderr=False)
+console = Console(stderr=False)
 
 
 # Command registry for Factory pattern
@@ -112,7 +112,7 @@ class CliArgumentParser(argparse.ArgumentParser):
         Args:
             message: 오류 메시지
         """
-        CONSOLE.print(
+        console.print(
             Panel.fit(
                 f"[bold red]인자 오류[/bold red]\n{message}\n\n[dim]도움말: uv run ivr --help[/dim]",
                 title="CLI 입력 오류",
@@ -308,7 +308,7 @@ def setup_logging(log_level: str) -> logging.Logger:
     root_logger.setLevel(getattr(logging, log_level.upper(), logging.INFO))
 
     # Rich 콘솔 핸들러
-    console_handler = RichHandler(rich_tracebacks=True, markup=True, console=CONSOLE, show_time=False)
+    console_handler = RichHandler(rich_tracebacks=True, markup=True, console=console, show_time=False)
     console_handler.setFormatter(logging.Formatter("%(message)s"))
     root_logger.addHandler(console_handler)
 
@@ -339,7 +339,7 @@ def _get_banner() -> str:
 
 def print_banner() -> None:
     """시작 배너를 출력한다."""
-    CONSOLE.print(Text(_get_banner(), style="bold cyan"))
+    console.print(Text(_get_banner(), style="bold cyan"))
 
 
 # Command factory functions (Registry pattern)
@@ -526,20 +526,20 @@ def handle_error(error: Exception, command: str, elapsed: float, logger: logging
     error_table.add_row("경과 시간", format_time(elapsed))
 
     # Panel로 감싸서 출력
-    CONSOLE.print()
-    CONSOLE.print(
+    console.print()
+    console.print(
         Panel(error_table, title=f"[bold red]❌ {command} 실행 실패[/bold red]",
               border_style="red", padding=(1, 2))
     )
-    CONSOLE.print()
+    console.print()
 
     # 도움말 제안
     help_text = Text()
     help_text.append("💡 도움말: ", style="bold yellow")
     help_text.append(f"ivr {command} --help", style="cyan")
     help_text.append(" 명령으로 상세 옵션을 확인하세요", style="dim")
-    CONSOLE.print(help_text)
-    CONSOLE.print()
+    console.print(help_text)
+    console.print()
 
 
 def main() -> int:
@@ -564,7 +564,7 @@ def main() -> int:
         elapsed = perf_counter() - start
 
         logger.info("\\[%s\\] 단계 완료 (%.2fs)", command_name, elapsed)
-        CONSOLE.print(create_result_panel(command_name, elapsed, result))
+        console.print(create_result_panel(command_name, elapsed, result))
         return 0
 
     except KeyboardInterrupt:
