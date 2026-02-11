@@ -12,8 +12,6 @@ import os
 from pathlib import Path
 from typing import Iterator, TypedDict, cast
 
-from tokenizers import Tokenizer, models, pre_tokenizers, trainers
-from transformers import AutoTokenizer, PreTrainedTokenizerBase, PreTrainedTokenizerFast
 
 # 병렬 처리 활성화
 os.environ["TOKENIZERS_PARALLELISM"] = "true"
@@ -35,9 +33,7 @@ class DistillResult(TypedDict):
     original_vocab_size: int
 
 
-def get_training_corpus(
-    corpus_dir: Path, batch_size: int = 1000
-) -> Iterator[list[str]]:
+def get_training_corpus(corpus_dir: Path, batch_size: int = 1000) -> Iterator[list[str]]:
     """클린 코퍼스 디렉토리에서 텍스트 파일을 읽어 학습 코퍼스 이터레이터를 생성한다.
 
     Args:
@@ -90,24 +86,18 @@ def distill_unigram_tokenizer(
     Raises:
         Exception: 토크나이저 로드 또는 학습 실패 시
     """
+    from tokenizers import Tokenizer, models, pre_tokenizers, trainers
+    from transformers import AutoTokenizer, PreTrainedTokenizerBase, PreTrainedTokenizerFast
+
     logger.info("Unigram 토크나이저 증류 시작")
 
     # 1. GPT-2 BPE 토크나이저 로드
-    tokenizer_files = (
-        list(original_tokenizer_dir.glob("*"))
-        if original_tokenizer_dir.exists()
-        else []
-    )
+    tokenizer_files = list(original_tokenizer_dir.glob("*")) if original_tokenizer_dir.exists() else []
 
-    has_tokenizer_files = any(
-        f.name in ["tokenizer.json", "vocab.json", "merges.txt"]
-        for f in tokenizer_files
-    )
+    has_tokenizer_files = any(f.name in ["tokenizer.json", "vocab.json", "merges.txt"] for f in tokenizer_files)
 
     if not has_tokenizer_files:
-        raise FileNotFoundError(
-            f"원본 토크나이저 파일이 없습니다: {original_tokenizer_dir}"
-        )
+        raise FileNotFoundError(f"원본 토크나이저 파일이 없습니다: {original_tokenizer_dir}")
 
     try:
         original_tokenizer = cast(
@@ -116,9 +106,7 @@ def distill_unigram_tokenizer(
         )
         logger.info("원본 토크나이저 로드 완료 (vocab_size: %d)", len(original_tokenizer.get_vocab()))
     except Exception as e:
-        raise RuntimeError(
-            f"원본 토크나이저 로드 실패: {original_tokenizer_dir}"
-        ) from e
+        raise RuntimeError(f"원본 토크나이저 로드 실패: {original_tokenizer_dir}") from e
 
     original_vocab_size = len(original_tokenizer.get_vocab())
     vocab_size = original_vocab_size
@@ -135,9 +123,7 @@ def distill_unigram_tokenizer(
     if unk_token not in special_tokens:
         special_tokens.append(unk_token)
 
-    trainer = trainers.UnigramTrainer(
-        vocab_size=vocab_size, special_tokens=special_tokens, unk_token=unk_token
-    )
+    trainer = trainers.UnigramTrainer(vocab_size=vocab_size, special_tokens=special_tokens, unk_token=unk_token)
     logger.info("UnigramTrainer 설정 (vocab_size: %d, special_tokens: %s)", vocab_size, special_tokens)
 
     # 4. 코퍼스를 사용하여 토크나이저 학습

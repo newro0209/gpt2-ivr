@@ -10,7 +10,6 @@ import logging
 from pathlib import Path
 from typing import TypedDict
 
-from transformers import AutoConfig, AutoTokenizer, PreTrainedTokenizerBase
 
 logger = logging.getLogger(__name__)
 
@@ -44,14 +43,13 @@ def initialize_assets(
     Returns:
         초기화 결과 정보를 담은 딕셔너리
     """
+    from transformers import AutoConfig, AutoTokenizer, PreTrainedTokenizerBase
+
     logger.info("모델 초기화 시작: %s", model_name)
 
     # 이미 토크나이저가 존재하는지 확인
     tokenizer_files = list(tokenizer_dir.glob("*")) if tokenizer_dir.exists() else []
-    has_tokenizer = any(
-        f.name in ["tokenizer.json", "vocab.json", "merges.txt"]
-        for f in tokenizer_files
-    )
+    has_tokenizer = any(f.name in ["tokenizer.json", "vocab.json", "merges.txt"] for f in tokenizer_files)
 
     if has_tokenizer and not force:
         logger.info("기존 토크나이저 사용: %s", tokenizer_dir)

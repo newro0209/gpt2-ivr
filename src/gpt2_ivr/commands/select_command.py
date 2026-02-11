@@ -6,19 +6,16 @@
 
 from __future__ import annotations
 
-import argparse
 import logging
 from pathlib import Path
 from typing import Any
 
+from collections import Counter
+
 from rich.console import Console
+from rich.progress import track
 from rich.table import Table
 
-from gpt2_ivr.analysis.candidate_selection import (
-    select_replacement_candidates,
-    write_replacement_csv,
-    write_selection_log,
-)
 from gpt2_ivr.constants import (
     BPE_TOKEN_ID_SEQUENCES_FILE,
     REPLACEMENT_CANDIDATES_FILE,
@@ -26,7 +23,7 @@ from gpt2_ivr.constants import (
     TOKENIZER_ORIGINAL_DIR,
     TOKEN_FREQUENCY_FILE,
 )
-from gpt2_ivr.parser import CliHelpFormatter, positive_int
+from gpt2_ivr.parser import CliHelpFormatter, non_negative_int, positive_int
 
 from .base import Command, SubparsersLike
 
@@ -48,6 +45,8 @@ class SelectCommand(Command):
         tokenizer_dir: 원본 토크나이저 디렉토리
         max_candidates: 최대 후보 개수
         min_token_len: 보호 토큰 최소 길이
+        workers: 병렬로 사용할 워커 스레드 수
+        chunk_size: 워커에게 제출할 라인 청크 크기
     """
 
     @staticmethod
@@ -76,6 +75,18 @@ class SelectCommand(Command):
         )
         parser.add_argument("--max-candidates", type=positive_int, default=1000, help="최대 후보 개수")
         parser.add_argument("--min-token-len", type=positive_int, default=2, help="보호 토큰 최소 길이")
+        parser.add_argument(
+            "--workers",
+            type=non_negative_int,
+            default=0,
+            help="바이그램 병합 시 사용할 워커 스레드 수 (0이면 CPU 수 - 1 자동)",
+        )
+        parser.add_argument(
+            "--chunk-size",
+            type=non_negative_int,
+            default=0,
+            help="한 워커가 처리할 라인 청크 크기 (0이면 workers × 2,048)",
+        )
 
     def __init__(
         self,
@@ -87,6 +98,8 @@ class SelectCommand(Command):
         tokenizer_dir: Path,
         max_candidates: int,
         min_token_len: int,
+        workers: int,
+        chunk_size: int,
     ):
         self.console = console
         self.frequency_path = frequency_path
@@ -96,72 +109,96 @@ class SelectCommand(Command):
         self.tokenizer_dir = tokenizer_dir
         self.max_candidates = max_candidates
         self.min_token_len = min_token_len
+        self.workers = workers
+        self.chunk_size = chunk_size
 
     def execute(self) -> dict[str, Any]:
         """교체 후보 선정을 실행한다.
 
-        토큰 빈도와 바이그램 통계를 분석하여 교체 후보 쌍을 생성하고
-        CSV와 마크다운 로그로 저장한다.
+        준비 단계는 Console.status() 스피너로,
+        바이그램 집계는 rich.progress.track()으로 진행률을 표시한다.
 
         Returns:
             선정 결과 딕셔너리 (pairs_count, csv_path, log_path, sacrifice_count, new_token_count)
         """
-        (
-            bigram_counts,
-            new_tokens_list,
-            tokenizer,
-            sacrifices,
-            pairs,
-        ) = select_replacement_candidates(
-            frequency_path=self.frequency_path,
-            sequences_path=self.sequences_path,
-            output_csv=self.output_csv,
-            output_log=self.output_log,
-            tokenizer_dir=self.tokenizer_dir,
-            max_candidates=self.max_candidates,
-            min_token_len=self.min_token_len,
+
+        from gpt2_ivr.analysis.candidate_selection import (
+            discover_new_token_candidates,
+            match_candidates,
+            select_replacement_candidates,
+            write_replacement_csv,
+            write_selection_log,
         )
 
-        # 결과 저장
+        # Phase 1: 준비 (빈도 로드, 토크나이저, 희생 후보 선정)
+        with self.console.status("교체 후보 준비 중..."):
+            ctx = select_replacement_candidates(
+                frequency_path=self.frequency_path,
+                sequences_path=self.sequences_path,
+                tokenizer_dir=self.tokenizer_dir,
+                max_candidates=self.max_candidates,
+                min_token_len=self.min_token_len,
+                workers=self.workers,
+                chunk_size=self.chunk_size,
+            )
+
+        # Phase 2: 바이그램 집계 (무거운 I/O — track으로 진행률 표시)
+        bigram_counts: Counter[tuple[int, int]] = Counter()
+        for chunk_counter in track(ctx.bigram_chunks, description="바이그램 집계 중"):
+            bigram_counts.update(chunk_counter)
+        logger.info("고유 바이그램 %d개 집계 완료", len(bigram_counts))
+
+        # Phase 3: 신규 토큰 후보 탐색 + 매칭
+        with self.console.status("신규 토큰 후보 탐색 중..."):
+            new_tokens = discover_new_token_candidates(
+                bigram_counts, ctx.tokenizer, ctx.max_candidates
+            )
+
+        with self.console.status("교체 후보 매칭 중..."):
+            pairs = match_candidates(ctx.sacrifices, new_tokens)
+
+        # Phase 4: 결과 저장
         write_replacement_csv(pairs, self.output_csv)
         write_selection_log(
             pairs=pairs,
-            total_vocab=tokenizer.vocab_size,
-            total_protected=len(sacrifices),
-            total_sacrifice_pool=tokenizer.vocab_size - len(sacrifices),
+            total_vocab=ctx.tokenizer.vocab_size,
+            total_protected=ctx.protected_count,
+            total_sacrifice_pool=ctx.tokenizer.vocab_size - ctx.protected_count,
             total_bigrams=len(bigram_counts),
             output_path=self.output_log,
         )
 
-        # Rich 테이블로 결과 출력
-        table = Table(title="🎯 교체 후보 선정 결과", show_header=True, title_style="bold green")
+        # Phase 5: Rich 테이블로 결과 출력
+        table = Table(title="교체 후보 선정 결과", show_header=True, title_style="bold green")
         table.add_column("항목", style="bold cyan", width=20)
         table.add_column("값", style="yellow", justify="right")
 
         table.add_row("교체 후보 쌍", f"{len(pairs):,}개")
-        table.add_row("희생 후보", f"{len(sacrifices):,}개")
-        table.add_row("신규 토큰 후보", f"{len(new_tokens_list):,}개")
+        table.add_row("희생 후보", f"{len(ctx.sacrifices):,}개")
+        table.add_row("신규 토큰 후보", f"{len(new_tokens):,}개")
         table.add_row("고유 바이그램", f"{len(bigram_counts):,}개")
-        table.add_row("", "")  # 빈 줄
+        table.add_row("", "")
         table.add_row("CSV 파일", str(self.output_csv))
         table.add_row("로그 파일", str(self.output_log))
 
         self.console.print()
         self.console.print(table)
 
-        # 샘플 교체 후보 표시 (상위 5개)
+        # 샘플 교체 후보 표시 (상위 10개)
         if pairs:
-            sample_table = Table(title="📋 교체 후보 샘플 (상위 5개)", show_header=True, border_style="dim")
+            sample_table = Table(title="교체 후보 샘플 (상위 10개)", show_header=True, border_style="dim")
             sample_table.add_column("희생 토큰 ID", style="red", width=15, justify="center")
             sample_table.add_column("→", style="dim", width=3, justify="center")
             sample_table.add_column("신규 토큰", style="green", width=30)
             sample_table.add_column("빈도", style="yellow", width=12, justify="right")
 
-            for pair in pairs[:5]:
-                sacrifice_id = pair.sacrifice.token_id
-                new_token = pair.new_token.merged_str
-                frequency = pair.new_token.bigram_freq
-                sample_table.add_row(f"{sacrifice_id}", "→", f"{new_token}", f"{frequency:,}회")
+            for pair in pairs[:10]:
+                sample_table.add_row(
+                    f"{pair.sacrifice.token_id}",
+                    "→",
+                    f"{pair.new_token.merged_str}",
+                    f"{pair.new_token.bigram_freq:,}회",
+                )
 
             self.console.print()
             self.console.print(sample_table)
@@ -172,8 +209,8 @@ class SelectCommand(Command):
             "pairs_count": len(pairs),
             "csv_path": self.output_csv,
             "log_path": self.output_log,
-            "sacrifice_count": len(sacrifices),
-            "new_token_count": len(new_tokens_list),
+            "sacrifice_count": len(ctx.sacrifices),
+            "new_token_count": len(new_tokens),
         }
 
     def get_name(self) -> str:

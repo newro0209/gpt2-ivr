@@ -6,7 +6,6 @@ GPT-2 BPE 토크나이저를 Unigram 모델로 증류하는 단계를 수행한�
 
 from __future__ import annotations
 
-import argparse
 from pathlib import Path
 from typing import Any
 
@@ -20,7 +19,6 @@ from gpt2_ivr.constants import (
     TOKENIZER_ORIGINAL_DIR,
 )
 from gpt2_ivr.parser import CliHelpFormatter
-from gpt2_ivr.tokenizer import distill_unigram_tokenizer
 
 from .base import Command, SubparsersLike
 
@@ -80,6 +78,7 @@ class DistillCommand(Command):
         Returns:
             증류 결과 딕셔너리 (output_dir, vocab_size, original_vocab_size)
         """
+        from gpt2_ivr.tokenizer import distill_unigram_tokenizer
         result = distill_unigram_tokenizer(
             original_tokenizer_dir=self.original_tokenizer_dir,
             distilled_tokenizer_dir=self.distilled_tokenizer_dir,

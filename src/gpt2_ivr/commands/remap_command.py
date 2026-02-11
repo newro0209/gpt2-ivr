@@ -6,16 +6,13 @@
 
 from __future__ import annotations
 
-import argparse
 import logging
 from pathlib import Path
 from typing import Any
 
-import pandas as pd
 import yaml
 from rich.console import Console
 from rich.panel import Panel
-from tokenizers import Tokenizer
 
 from gpt2_ivr.commands.base import Command, SubparsersLike
 from gpt2_ivr.constants import (
@@ -100,6 +97,9 @@ class RemapCommand(Command):
             FileNotFoundError: 증류 토크나이저 또는 재할당 규칙 파일이 없는 경우
             ValueError: 재할당 규칙 형식이 올바르지 않은 경우
         """
+        import pandas as pd
+        from tokenizers import Tokenizer
+
         # 1. 증류 토크나이저 로드
         if not self.distilled_tokenizer_path.exists():
             raise FileNotFoundError(

@@ -6,7 +6,6 @@ Hugging Face Hub에서 GPT-2 모델과 토크나이저를 다운로드하여
 
 from __future__ import annotations
 
-import argparse
 from pathlib import Path
 from typing import Any
 

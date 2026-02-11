@@ -17,10 +17,6 @@ from rich.panel import Panel
 from rich.progress import track
 from rich.table import Table
 
-from gpt2_ivr.analysis.token_frequency import (
-    analyze_token_frequency,
-    write_frequency_parquet,
-)
 from gpt2_ivr.constants import (
     BPE_TOKEN_ID_SEQUENCES_FILE,
     CORPORA_CLEANED_DIR,
@@ -121,6 +117,12 @@ class AnalyzeCommand(Command):
         Returns:
             분석 결과 딕셔너리 (sequences_path, frequency_path, total_tokens, unique_tokens)
         """
+
+        from gpt2_ivr.analysis.token_frequency import (
+            analyze_token_frequency,
+            write_frequency_parquet,
+        )
+
         encoded_chunks_iterator, tokenizer = analyze_token_frequency(
             input_dir=self.input_dir,
             inputs=[],

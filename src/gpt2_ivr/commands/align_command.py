@@ -16,11 +16,7 @@ from rich.panel import Panel
 
 from gpt2_ivr.commands.base import Command, SubparsersLike
 from gpt2_ivr.constants import EMBEDDINGS_ROOT, REMAP_RULES_PATH, TOKENIZER_ORIGINAL_DIR, TOKENIZER_REMAPPED_DIR
-from gpt2_ivr.embedding import (
-    extract_embeddings,
-    initialize_new_token_embeddings,
-    reorder_embeddings,
-)
+
 from gpt2_ivr.parser import CliHelpFormatter
 
 
@@ -101,6 +97,12 @@ class AlignCommand(Command):
         Returns:
             실행 결과 딕셔너리 (status, extract_result, reorder_result, init_result, embeddings_dir)
         """
+        from gpt2_ivr.embedding import (
+            extract_embeddings,
+            initialize_new_token_embeddings,
+            reorder_embeddings,
+        )
+
         # 1. 원본 모델에서 임베딩 추출
         self.console.print()
         self.console.print(Panel("[bold cyan]1단계: 원본 모델 임베딩 추출[/bold cyan]", border_style="blue"))

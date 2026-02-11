@@ -7,11 +7,13 @@ token_frequency.parquet 와 bpe_token_id_sequences.txt 를 기반으로
 from __future__ import annotations
 
 import csv
+import os
 from collections import Counter
+from concurrent.futures import ThreadPoolExecutor
 from dataclasses import dataclass
 import logging
 from pathlib import Path
-from typing import TypedDict, cast
+from typing import Iterator, Sequence, TypedDict, cast
 
 import pyarrow.parquet as pq
 from transformers import GPT2Tokenizer
@@ -84,6 +86,29 @@ class ReplacementPair:
     sacrifice: SacrificeCandidate
     new_token: NewTokenCandidate
     score: float
+
+
+@dataclass(frozen=True, slots=True)
+class SelectionContext:
+    """교체 후보 선정을 위한 사전 준비 컨텍스트.
+
+    select_replacement_candidates()가 반환하며,
+    커맨드 레이어에서 바이그램 이터레이터를 소비한 후
+    후속 단계(discover, match)를 진행하는 데 사용한다.
+
+    Attributes:
+        bigram_chunks: 바이그램 빈도 청크 이터레이터 (지연 평가)
+        tokenizer: GPT-2 토크나이저
+        sacrifices: 희생 후보 리스트
+        protected_count: 보호 토큰 개수
+        max_candidates: 최대 후보 개수
+    """
+
+    bigram_chunks: Iterator[Counter[tuple[int, int]]]
+    tokenizer: GPT2Tokenizer
+    sacrifices: list[SacrificeCandidate]
+    protected_count: int
+    max_candidates: int
 
 
 def load_frequency(path: Path) -> dict[int, int]:
@@ -170,39 +195,60 @@ def select_sacrifice_candidates(
     return candidates[:max_candidates]
 
 
-def count_bigrams(
+def _count_bigrams_batch(lines: Sequence[str]) -> Counter[tuple[int, int]]:
+    """라인 묶음에서 인접 토큰 바이그램 빈도를 집계한다."""
+
+    counter: Counter[tuple[int, int]] = Counter()
+    for line in lines:
+        parts = line.split()
+        if len(parts) < 2:
+            continue
+        ids = [int(p) for p in parts]
+        for i in range(len(ids) - 1):
+            counter[(ids[i], ids[i + 1])] += 1
+    return counter
+
+
+def iter_bigram_chunks(
     sequences_path: Path,
-    logger: logging.Logger,
-) -> Counter[tuple[int, int]]:
-    """bpe_token_id_sequences.txt 에서 인접 토큰 바이그램 빈도를 집계한다.
+    workers: int,
+    chunk_size: int,
+) -> Iterator[Counter[tuple[int, int]]]:
+    """토큰 시퀀스 파일에서 바이그램 빈도를 청크 단위로 산출한다.
+
+    ThreadPoolExecutor.map()을 사용하여 청크별 Counter를 지연 생성한다.
+    호출자가 반복하며 최종 Counter로 병합해야 한다.
 
     Args:
         sequences_path: 토큰 시퀀스 파일 경로
-        logger: 로거 인스턴스
+        workers: 워커 스레드 수 (0이면 CPU 수 - 1)
+        chunk_size: 라인 청크 크기 (0이면 workers × 2,048)
 
-    Returns:
-        (left_id, right_id) 튜플을 키로 하는 빈도 카운터
+    Yields:
+        각 청크의 바이그램 빈도 Counter
     """
-    counter: Counter[tuple[int, int]] = Counter()
+    worker_count = workers if workers > 0 else max(1, (os.cpu_count() or 1) - 1)
+    resolved_chunk_size = chunk_size if chunk_size > 0 else max(1, worker_count * 2_048)
 
-    with sequences_path.open("r", encoding="utf-8") as handle:
-        for line in handle:
-            parts = line.split()
-            if len(parts) < 2:
-                continue
-            ids = [int(p) for p in parts]
-            for i in range(len(ids) - 1):
-                counter[(ids[i], ids[i + 1])] += 1
+    def _read_chunks() -> Iterator[tuple[str, ...]]:
+        chunk: list[str] = []
+        with sequences_path.open("r", encoding="utf-8") as handle:
+            for line in handle:
+                chunk.append(line)
+                if len(chunk) >= resolved_chunk_size:
+                    yield tuple(chunk)
+                    chunk.clear()
+            if chunk:
+                yield tuple(chunk)
 
-    logger.info("고유 바이그램 %d개 집계 완료", len(counter))
-    return counter
+    with ThreadPoolExecutor(max_workers=worker_count) as executor:
+        yield from executor.map(_count_bigrams_batch, _read_chunks())
 
 
 def discover_new_token_candidates(
     bigram_counts: Counter[tuple[int, int]],
     tokenizer: GPT2Tokenizer,
     max_candidates: int,
-    logger: logging.Logger,
 ) -> list[NewTokenCandidate]:
     """바이그램 빈도에서 신규 토큰 후보를 추출한다.
 
@@ -213,7 +259,6 @@ def discover_new_token_candidates(
         bigram_counts: 바이그램 빈도 카운터
         tokenizer: GPT-2 토크나이저
         max_candidates: 최대 후보 개수
-        logger: 로거 인스턴스
 
     Returns:
         빈도 내림차순 정렬된 신규 토큰 후보 리스트
@@ -405,31 +450,29 @@ def write_selection_log(
 def select_replacement_candidates(
     frequency_path: Path,
     sequences_path: Path,
-    output_csv: Path,
-    output_log: Path,
     tokenizer_dir: Path,
     max_candidates: int,
     min_token_len: int,
-) -> tuple[
-    Counter[tuple[int, int]],
-    list[NewTokenCandidate],
-    GPT2Tokenizer,
-    list[SacrificeCandidate],
-    list[ReplacementPair],
-]:
-    """IVR 교체 후보를 선정한다.
+    workers: int,
+    chunk_size: int,
+) -> SelectionContext:
+    """IVR 교체 후보 선정을 준비한다.
+
+    빈도 로드, 토크나이저 로드, 보호 토큰 구성, 희생 후보 선정 등
+    가벼운 전처리를 수행하고, 바이그램 집계 이터레이터를 구성하여 반환한다.
+    바이그램 집계(무거운 I/O)는 호출자가 이터레이터를 소비할 때 수행된다.
 
     Args:
         frequency_path: 토큰 빈도 parquet 파일 경로
         sequences_path: BPE 토큰 시퀀스 파일 경로
-        output_csv: 교체 후보 CSV 저장 경로 (SelectCommand에서 사용)
-        output_log: 선정 로그 저장 경로 (SelectCommand에서 사용)
         tokenizer_dir: 원본 토크나이저 디렉토리
         max_candidates: 최대 후보 개수
         min_token_len: 보호 토큰 최소 길이
+        workers: 병렬로 처리할 워커 스레드 수 (0이면 CPU 수 - 1 자동)
+        chunk_size: 각 워커에게 제출할 라인 청크 크기 (0이면 workers × 2,048)
 
     Returns:
-        필요한 집계 데이터 튜플: bigram_counts, new_tokens, tokenizer, sacrifices, pairs
+        바이그램 이터레이터와 사전 준비 컨텍스트를 담은 SelectionContext
 
     Raises:
         FileNotFoundError: 입력 파일 또는 원본 토크나이저가 없는 경우
@@ -461,7 +504,6 @@ def select_replacement_candidates(
     logger.info("보호 토큰 %d개 설정", len(protected_ids))
 
     # 4) 희생 후보 선정
-    logger.info("희생 후보 선정 시작 (최대 %d개)", max_candidates)
     sacrifices = select_sacrifice_candidates(
         freq, tokenizer, protected_ids, max_candidates
     )
@@ -470,24 +512,17 @@ def select_replacement_candidates(
         zero_freq_count = sum(1 for s in sacrifices if s.frequency == 0)
         logger.info("미출현(빈도 0) 토큰: %d개", zero_freq_count)
 
-    # 5) 바이그램 집계
-    logger.info("바이그램 집계 시작")
-    bigram_counts = count_bigrams(sequences_path, logger)
-
-    # 6) 신규 토큰 후보 탐색
-    logger.info("신규 토큰 후보 탐색 시작 (최대 %d개)", max_candidates)
-    new_tokens = discover_new_token_candidates(
-        bigram_counts, tokenizer, max_candidates, logger
+    # 5) 바이그램 이터레이터 구성 (지연 평가)
+    bigram_chunks = iter_bigram_chunks(
+        sequences_path,
+        workers=workers,
+        chunk_size=chunk_size,
     )
 
-    # 7) 매칭
-    pairs = match_candidates(sacrifices, new_tokens)
-    logger.info("교체 후보 %d쌍 매칭 완료", len(pairs))
-
-    return (
-        bigram_counts,
-        new_tokens,
-        tokenizer,
-        sacrifices,
-        pairs,
+    return SelectionContext(
+        bigram_chunks=bigram_chunks,
+        tokenizer=tokenizer,
+        sacrifices=sacrifices,
+        protected_count=len(protected_ids),
+        max_candidates=max_candidates,
     )

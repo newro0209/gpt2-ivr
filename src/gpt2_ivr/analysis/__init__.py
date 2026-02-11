@@ -6,10 +6,11 @@
 
 from __future__ import annotations
 
-from .candidate_selection import select_replacement_candidates
+from .candidate_selection import SelectionContext, select_replacement_candidates
 from .token_frequency import analyze_token_frequency
 
 __all__ = [
+    "SelectionContext",
     "analyze_token_frequency",
     "select_replacement_candidates",
 ]

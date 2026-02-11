@@ -23,6 +23,7 @@ from rich.panel import Panel
 from rich.table import Table
 from rich.text import Text
 
+
 from gpt2_ivr.commands.base import Command
 from gpt2_ivr.constants import LOGS_DIR
 from gpt2_ivr.parser import setup_parser
@@ -240,9 +241,9 @@ def handle_error(error: Exception, command: str, elapsed: float, logger: logging
 
     # 로깅
     if type(error) in _ERROR_CATEGORIES:
-        logger.error("[%s] %s: %s", command, log_msg, error)
+        logger.error("%s %s: %s", command, log_msg, error)
     else:
-        logger.exception("[%s] %s", command, log_msg)
+        logger.exception("%s %s", command, log_msg)
 
     # Rich 테이블로 에러 정보 구성
     error_table = Table(show_header=False, border_style="dim red", padding=(0, 1))
@@ -287,11 +288,11 @@ def main() -> int:
     try:
         command = create_command(args)
         command_name = command.get_name()
-        logger.info("[%s] 단계 시작", command_name)
+        logger.info("%s 단계 시작", command_name)
         result = command.execute()
         elapsed = perf_counter() - start
 
-        logger.info("[%s] 단계 완료 (%.2fs)", command_name, elapsed)
+        logger.info("%s 단계 완료 (%.2fs)", command_name, elapsed)
         console.print(create_result_panel(command_name, elapsed, result))
         return 0
 
