@@ -6,6 +6,7 @@
 
 from __future__ import annotations
 
+import argparse
 import logging
 from pathlib import Path
 from typing import Any
@@ -13,14 +14,14 @@ from typing import Any
 from rich.console import Console
 from rich.panel import Panel
 
-from gpt2_ivr.commands.base import Command
+from gpt2_ivr.commands.base import Command, SubparsersLike
+from gpt2_ivr.constants import EMBEDDINGS_ROOT, REMAP_RULES_PATH, TOKENIZER_ORIGINAL_DIR, TOKENIZER_REMAPPED_DIR
 from gpt2_ivr.embedding import (
     extract_embeddings,
     initialize_new_token_embeddings,
     reorder_embeddings,
 )
-
-console = Console()
+from gpt2_ivr.parser import CliHelpFormatter
 
 
 class AlignCommand(Command):
@@ -31,6 +32,7 @@ class AlignCommand(Command):
     3단계: 신규 토큰 임베딩 초기화 (mean, random, zeros)
 
     Attributes:
+        console: Rich 콘솔 인스턴스
         logger: 로거 인스턴스
         model_name: GPT-2 모델 이름
         original_tokenizer_dir: 원본 토크나이저 디렉토리
@@ -40,8 +42,41 @@ class AlignCommand(Command):
         init_strategy: 신규 토큰 임베딩 초기화 전략
     """
 
+    @staticmethod
+    def configure_parser(subparsers: SubparsersLike) -> None:
+        """서브커맨드 파서를 설정한다.
+
+        Args:
+            subparsers: 서브파서 액션 객체
+        """
+        parser = subparsers.add_parser("align", help="임베딩 재정렬", formatter_class=CliHelpFormatter)
+        parser.add_argument("--model-name", default="openai-community/gpt2", help="GPT-2 모델 이름")
+        parser.add_argument(
+            "--original-tokenizer-dir",
+            type=Path,
+            default=TOKENIZER_ORIGINAL_DIR,
+            help="원본 토크나이저 디렉토리",
+        )
+        parser.add_argument(
+            "--remapped-tokenizer-dir",
+            type=Path,
+            default=TOKENIZER_REMAPPED_DIR,
+            help="재할당 토크나이저 디렉토리",
+        )
+        parser.add_argument(
+            "--remap-rules-path",
+            type=Path,
+            default=REMAP_RULES_PATH,
+            help="재할당 규칙 파일 경로",
+        )
+        parser.add_argument("--embeddings-output-dir", type=Path, default=EMBEDDINGS_ROOT, help="임베딩 출력 디렉토리")
+        parser.add_argument(
+            "--init-strategy", default="mean", choices=["mean", "random", "zeros"], help="신규 토큰 임베딩 초기화 전략"
+        )
+
     def __init__(
         self,
+        console: Console,
         model_name: str,
         original_tokenizer_dir: Path,
         remapped_tokenizer_dir: Path,
@@ -49,6 +84,7 @@ class AlignCommand(Command):
         embeddings_output_dir: Path,
         init_strategy: str,
     ) -> None:
+        self.console = console
         self.logger = logging.getLogger("gpt2_ivr.align")
         self.model_name = model_name
         self.original_tokenizer_dir = original_tokenizer_dir
@@ -57,20 +93,17 @@ class AlignCommand(Command):
         self.embeddings_output_dir = embeddings_output_dir
         self.init_strategy = init_strategy
 
-    def execute(self, **kwargs: Any) -> dict[str, Any]:
+    def execute(self) -> dict[str, Any]:
         """임베딩 정렬을 실행한다.
 
         임베딩 추출, 재정렬, 초기화의 3단계를 순차적으로 수행한다.
-
-        Args:
-            **kwargs: 사용되지 않음
 
         Returns:
             실행 결과 딕셔너리 (status, extract_result, reorder_result, init_result, embeddings_dir)
         """
         # 1. 원본 모델에서 임베딩 추출
-        console.print()
-        console.print(Panel("[bold cyan]1단계: 원본 모델 임베딩 추출[/bold cyan]", border_style="blue"))
+        self.console.print()
+        self.console.print(Panel("[bold cyan]1단계: 원본 모델 임베딩 추출[/bold cyan]", border_style="blue"))
 
         extract_result = extract_embeddings(
             model_name=self.model_name,
@@ -79,8 +112,8 @@ class AlignCommand(Command):
         )
 
         # 2. Remap 규칙에 따라 임베딩 재정렬
-        console.print()
-        console.print(Panel("[bold cyan]2단계: 임베딩 재정렬[/bold cyan]", border_style="blue"))
+        self.console.print()
+        self.console.print(Panel("[bold cyan]2단계: 임베딩 재정렬[/bold cyan]", border_style="blue"))
 
         reorder_result = reorder_embeddings(
             original_wte_path=extract_result["wte"],
@@ -92,8 +125,8 @@ class AlignCommand(Command):
         )
 
         # 3. 신규 토큰 임베딩 초기화
-        console.print()
-        console.print(Panel("[bold cyan]3단계: 신규 토큰 임베딩 초기화[/bold cyan]", border_style="blue"))
+        self.console.print()
+        self.console.print(Panel("[bold cyan]3단계: 신규 토큰 임베딩 초기화[/bold cyan]", border_style="blue"))
 
         init_result = initialize_new_token_embeddings(
             aligned_wte_path=reorder_result["aligned_wte"],
@@ -111,9 +144,9 @@ class AlignCommand(Command):
 [yellow]임베딩 디렉토리:[/yellow] {self.embeddings_output_dir}
 [yellow]초기화 전략:[/yellow] {self.init_strategy}"""
 
-        console.print()
-        console.print(Panel(result_text, title="align 단계 완료", border_style="green"))
-        console.print()
+        self.console.print()
+        self.console.print(Panel(result_text, title="align 단계 완료", border_style="green"))
+        self.console.print()
 
         return {
             "status": "success",

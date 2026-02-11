@@ -62,3 +62,9 @@ LOGS_DIR = ARTIFACTS_ROOT / "logs"
 
 TRAINING_ROOT = ARTIFACTS_ROOT / "training"
 TRAINING_CHECKPOINT_DIR = TRAINING_ROOT / "sft_checkpoint"
+
+# ====================================================================
+# ⚙️ 기타 설정 경로
+# ====================================================================
+
+REMAP_RULES_PATH = Path("src/gpt2_ivr/tokenizer/remap_rules.yaml")

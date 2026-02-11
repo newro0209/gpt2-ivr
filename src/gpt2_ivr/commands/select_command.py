@@ -6,6 +6,7 @@
 
 from __future__ import annotations
 
+import argparse
 import logging
 from pathlib import Path
 from typing import Any
@@ -18,11 +19,18 @@ from gpt2_ivr.analysis.candidate_selection import (
     write_replacement_csv,
     write_selection_log,
 )
+from gpt2_ivr.constants import (
+    BPE_TOKEN_ID_SEQUENCES_FILE,
+    REPLACEMENT_CANDIDATES_FILE,
+    SELECTION_LOG_FILE,
+    TOKENIZER_ORIGINAL_DIR,
+    TOKEN_FREQUENCY_FILE,
+)
+from gpt2_ivr.parser import CliHelpFormatter, positive_int
 
-from .base import Command
+from .base import Command, SubparsersLike
 
 logger = logging.getLogger(__name__)
-console = Console()
 
 
 class SelectCommand(Command):
@@ -32,6 +40,7 @@ class SelectCommand(Command):
     교체 쌍을 생성한다.
 
     Attributes:
+        console: Rich 콘솔 인스턴스
         frequency_path: 토큰 빈도 parquet 파일 경로
         sequences_path: BPE 토큰 시퀀스 파일 경로
         output_csv: 교체 후보 CSV 저장 경로
@@ -41,8 +50,36 @@ class SelectCommand(Command):
         min_token_len: 보호 토큰 최소 길이
     """
 
+    @staticmethod
+    def configure_parser(subparsers: SubparsersLike) -> None:
+        """서브커맨드 파서를 설정한다.
+
+        Args:
+            subparsers: 서브파서 액션 객체
+        """
+        parser = subparsers.add_parser("select", help="IVR 대상 토큰 선정", formatter_class=CliHelpFormatter)
+        parser.add_argument(
+            "--frequency-path", type=Path, default=TOKEN_FREQUENCY_FILE, help="토큰 빈도 parquet 파일 경로"
+        )
+        parser.add_argument(
+            "--sequences-path", type=Path, default=BPE_TOKEN_ID_SEQUENCES_FILE, help="BPE 토큰 시퀀스 파일 경로"
+        )
+        parser.add_argument(
+            "--output-csv", type=Path, default=REPLACEMENT_CANDIDATES_FILE, help="교체 후보 CSV 저장 경로"
+        )
+        parser.add_argument("--output-log", type=Path, default=SELECTION_LOG_FILE, help="선정 로그 저장 경로")
+        parser.add_argument(
+            "--tokenizer-dir",
+            type=Path,
+            default=TOKENIZER_ORIGINAL_DIR,
+            help="원본 토크나이저 디렉토리",
+        )
+        parser.add_argument("--max-candidates", type=positive_int, default=1000, help="최대 후보 개수")
+        parser.add_argument("--min-token-len", type=positive_int, default=2, help="보호 토큰 최소 길이")
+
     def __init__(
         self,
+        console: Console,
         frequency_path: Path,
         sequences_path: Path,
         output_csv: Path,
@@ -51,6 +88,7 @@ class SelectCommand(Command):
         max_candidates: int,
         min_token_len: int,
     ):
+        self.console = console
         self.frequency_path = frequency_path
         self.sequences_path = sequences_path
         self.output_csv = output_csv
@@ -59,14 +97,11 @@ class SelectCommand(Command):
         self.max_candidates = max_candidates
         self.min_token_len = min_token_len
 
-    def execute(self, **kwargs: Any) -> dict[str, Any]:
+    def execute(self) -> dict[str, Any]:
         """교체 후보 선정을 실행한다.
 
         토큰 빈도와 바이그램 통계를 분석하여 교체 후보 쌍을 생성하고
         CSV와 마크다운 로그로 저장한다.
-
-        Args:
-            **kwargs: 사용되지 않음
 
         Returns:
             선정 결과 딕셔너리 (pairs_count, csv_path, log_path, sacrifice_count, new_token_count)
@@ -111,8 +146,8 @@ class SelectCommand(Command):
         table.add_row("CSV 파일", str(self.output_csv))
         table.add_row("로그 파일", str(self.output_log))
 
-        console.print()
-        console.print(table)
+        self.console.print()
+        self.console.print(table)
 
         # 샘플 교체 후보 표시 (상위 5개)
         if pairs:
@@ -126,17 +161,12 @@ class SelectCommand(Command):
                 sacrifice_id = pair.sacrifice.token_id
                 new_token = pair.new_token.merged_str
                 frequency = pair.new_token.bigram_freq
-                sample_table.add_row(
-                    f"{sacrifice_id}",
-                    "→",
-                    f"{new_token}",
-                    f"{frequency:,}회"
-                )
+                sample_table.add_row(f"{sacrifice_id}", "→", f"{new_token}", f"{frequency:,}회")
 
-            console.print()
-            console.print(sample_table)
+            self.console.print()
+            self.console.print(sample_table)
 
-        console.print()
+        self.console.print()
 
         return {
             "pairs_count": len(pairs),

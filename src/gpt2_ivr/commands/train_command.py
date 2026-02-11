@@ -6,15 +6,17 @@
 
 from __future__ import annotations
 
+import argparse
 import logging
 from typing import Any
 
 from rich.console import Console
 from rich.panel import Panel
 
-from gpt2_ivr.commands.base import Command
+from gpt2_ivr.commands.base import Command, SubparsersLike
+from gpt2_ivr.parser import CliHelpFormatter
 
-console = Console()
+logger = logging.getLogger(__name__)
 
 
 class TrainCommand(Command):
@@ -24,19 +26,25 @@ class TrainCommand(Command):
     향후 accelerate 기반 학습 파이프라인이 추가될 예정이다.
 
     Attributes:
-        logger: 로거 인스턴스
+        console: Rich 콘솔 인스턴스
     """
 
-    def __init__(self) -> None:
-        self.logger = logging.getLogger("gpt2_ivr.train")
+    @staticmethod
+    def configure_parser(subparsers: SubparsersLike) -> None:
+        """서브커맨드 파서를 설정한다.
 
-    def execute(self, **kwargs: Any) -> dict[str, Any]:
+        Args:
+            subparsers: 서브파서 액션 객체
+        """
+        subparsers.add_parser("train", help="미세조정", formatter_class=CliHelpFormatter)
+
+    def __init__(self, console: Console) -> None:
+        self.console = console
+
+    def execute(self) -> dict[str, Any]:
         """학습 단계를 실행한다.
 
         현재는 미구현 상태이며 향후 구현 예정이다.
-
-        Args:
-            **kwargs: 사용되지 않음
 
         Returns:
             실행 결과 딕셔너리 (status, message)
@@ -46,9 +54,9 @@ class TrainCommand(Command):
 향후 [cyan]src/gpt2_ivr/training/train.py[/cyan]를 통해
 accelerate 기반 학습을 연결할 예정입니다."""
 
-        console.print()
-        console.print(Panel(message_text, title="train 단계", border_style="yellow"))
-        console.print()
+        self.console.print()
+        self.console.print(Panel(message_text, title="train 단계", border_style="yellow"))
+        self.console.print()
 
         return {
             "status": "not_implemented",

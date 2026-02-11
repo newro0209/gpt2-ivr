@@ -6,6 +6,7 @@
 
 from __future__ import annotations
 
+import argparse
 import logging
 from pathlib import Path
 from typing import Any
@@ -16,9 +17,16 @@ from rich.console import Console
 from rich.panel import Panel
 from tokenizers import Tokenizer
 
-from gpt2_ivr.commands.base import Command
+from gpt2_ivr.commands.base import Command, SubparsersLike
+from gpt2_ivr.constants import (
+    REMAP_RULES_PATH,
+    REPLACEMENT_CANDIDATES_FILE,
+    TOKENIZER_DISTILLED_UNIGRAM_DIR,
+    TOKENIZER_REMAPPED_DIR,
+)
+from gpt2_ivr.parser import CliHelpFormatter
 
-console = Console()
+logger = logging.getLogger(__name__)
 
 
 class RemapCommand(Command):
@@ -28,34 +36,62 @@ class RemapCommand(Command):
     재할당된 토크나이저를 저장한다.
 
     Attributes:
-        logger: 로거 인스턴스
+        console: Rich 콘솔 인스턴스
         distilled_tokenizer_path: 증류된 토크나이저 디렉토리
         remapped_tokenizer_path: 재할당 토크나이저 저장 디렉토리
         remap_rules_path: 재할당 규칙 YAML 파일 경로
         replacement_candidates_path: 교체 후보 CSV 경로
     """
 
+    @staticmethod
+    def configure_parser(subparsers: SubparsersLike) -> None:
+        """서브커맨드 파서를 설정한다.
+
+        Args:
+            subparsers: 서브파서 액션 객체
+        """
+        parser = subparsers.add_parser("remap", help="토큰 재할당 규칙 적용", formatter_class=CliHelpFormatter)
+        parser.add_argument(
+            "--distilled-tokenizer-dir",
+            type=Path,
+            default=TOKENIZER_DISTILLED_UNIGRAM_DIR,
+            help="증류된 토크나이저 디렉토리",
+        )
+        parser.add_argument(
+            "--remapped-tokenizer-dir",
+            type=Path,
+            default=TOKENIZER_REMAPPED_DIR,
+            help="재할당 토크나이저 디렉토리",
+        )
+        parser.add_argument(
+            "--remap-rules-path",
+            type=Path,
+            default=REMAP_RULES_PATH,
+            help="재할당 규칙 파일 경로",
+        )
+        parser.add_argument(
+            "--replacement-candidates-path", type=Path, default=REPLACEMENT_CANDIDATES_FILE, help="교체 후보 CSV 경로"
+        )
+
     def __init__(
         self,
+        console: Console,
         distilled_tokenizer_dir: Path,
         remapped_tokenizer_dir: Path,
         remap_rules_path: Path,
         replacement_candidates_path: Path,
     ) -> None:
-        self.logger = logging.getLogger("gpt2_ivr.remap")
+        self.console = console
         self.distilled_tokenizer_path = distilled_tokenizer_dir
         self.remapped_tokenizer_path = remapped_tokenizer_dir
         self.remap_rules_path = remap_rules_path
         self.replacement_candidates_path = replacement_candidates_path
 
-    def execute(self, **kwargs: Any) -> dict[str, Any]:
+    def execute(self) -> dict[str, Any]:
         """토큰 재할당을 실행한다.
 
         증류 토크나이저에 재할당 규칙을 적용하여 신규 토큰을 추가하고
         재할당 토크나이저를 저장한다.
-
-        Args:
-            **kwargs: 사용되지 않음
 
         Returns:
             실행 결과 딕셔너리 (status, remapped_tokenizer_path)
@@ -72,49 +108,40 @@ class RemapCommand(Command):
                 f"{self.distilled_tokenizer_path}"
             )
 
-        tokenizer = Tokenizer.from_file(
-            str(self.distilled_tokenizer_path / "tokenizer.json")
-        )
-        self.logger.info("%s에서 증류 토크나이저 로드 완료", self.distilled_tokenizer_path)
+        tokenizer = Tokenizer.from_file(str(self.distilled_tokenizer_path / "tokenizer.json"))
+        logger.info("%s에서 증류 토크나이저 로드 완료", self.distilled_tokenizer_path)
 
         # 2. 교체 후보 로드 (선택, 로그 정보용)
         if self.replacement_candidates_path.exists():
             candidates_df = pd.read_csv(self.replacement_candidates_path)
-            self.logger.info(
+            logger.info(
                 "교체 후보 %d개 로드: %s",
                 len(candidates_df),
                 self.replacement_candidates_path,
             )
-            # self.logger.debug("교체 후보 샘플:\n%s", candidates_df.head())
+            # logger.debug("교체 후보 샘플:\n%s", candidates_df.head())
         else:
-            self.logger.warning(
+            logger.warning(
                 "교체 후보 CSV 없음: %s",
                 self.replacement_candidates_path,
             )
 
         # 3. 재할당 규칙 로드
         if not self.remap_rules_path.exists():
-            raise FileNotFoundError(
-                "재할당 규칙 파일을 찾을 수 없습니다: " f"{self.remap_rules_path}"
-            )
+            raise FileNotFoundError("재할당 규칙 파일을 찾을 수 없습니다: " f"{self.remap_rules_path}")
 
         with self.remap_rules_path.open("r", encoding="utf-8") as handle:
             loaded_rules = yaml.safe_load(handle)
 
         if loaded_rules is None:
-            self.logger.warning(
-                "재할당 규칙 비어 있음: %s", self.remap_rules_path
-            )
+            logger.warning("재할당 규칙 비어 있음: %s", self.remap_rules_path)
             remap_rules: dict[str, str] = {}
         elif isinstance(loaded_rules, dict):
             remap_rules = loaded_rules
         else:
-            raise ValueError(
-                "재할당 규칙 형식이 올바르지 않습니다. "
-                "YAML 매핑(dict) 형식이어야 합니다."
-            )
+            raise ValueError("재할당 규칙 형식이 올바르지 않습니다. " "YAML 매핑(dict) 형식이어야 합니다.")
 
-        self.logger.info(
+        logger.info(
             "재할당 규칙 %d개 로드: %s",
             len(remap_rules),
             self.remap_rules_path,
@@ -125,7 +152,7 @@ class RemapCommand(Command):
         # 토큰 ID/어휘 재배치를 더 정교하게 다룰 필요가 있다.
         # 여기서는 신규 토큰 추가 중심으로 동작한다.
         current_vocab_size = tokenizer.get_vocab_size()
-        self.logger.info("현재 토크나이저 vocab 크기: %d", current_vocab_size)
+        logger.info("현재 토크나이저 vocab 크기: %d", current_vocab_size)
 
         new_tokens_to_add = []
         for old_token, new_token in remap_rules.items():
@@ -135,7 +162,7 @@ class RemapCommand(Command):
             if old_id is None and new_id is None:
                 # 양쪽 모두 신규 토큰인 경우
                 new_tokens_to_add.append(new_token)
-                self.logger.info(
+                logger.info(
                     "규칙: '%s' -> '%s' (신규 토큰 추가 예정)",
                     old_token,
                     new_token,
@@ -143,21 +170,21 @@ class RemapCommand(Command):
             elif old_id is not None and new_id is None:
                 # 기존 토큰은 있고 신규 토큰은 없는 경우
                 new_tokens_to_add.append(new_token)
-                self.logger.info(
+                logger.info(
                     "규칙: '%s'(id:%d) -> '%s' (신규 토큰 추가 예정)",
                     old_token,
                     old_id,
                     new_token,
                 )
             elif old_id is None and new_id is not None:
-                self.logger.warning(
+                logger.warning(
                     "규칙 무시: '%s' -> '%s'(id:%d), 대상 토큰이 이미 존재합니다.",
                     old_token,
                     new_token,
                     new_id,
                 )
             else:  # 양쪽 모두 기존 토큰인 경우
-                self.logger.info(
+                logger.info(
                     "규칙: '%s'(id:%d) -> '%s'(id:%d), 기존 토큰 유지",
                     old_token,
                     old_id,
@@ -166,15 +193,15 @@ class RemapCommand(Command):
                 )
 
         if new_tokens_to_add:
-            self.logger.info("신규 토큰 %d개 추가", len(new_tokens_to_add))
+            logger.info("신규 토큰 %d개 추가", len(new_tokens_to_add))
             # 중복 제거 후 신규 토큰 추가
             tokenizer.add_tokens(list(set(new_tokens_to_add)))
-            self.logger.info(
+            logger.info(
                 "토큰 추가 후 vocab 크기: %d",
                 tokenizer.get_vocab_size(),
             )
         else:
-            self.logger.info("추가할 신규 토큰 없음")
+            logger.info("추가할 신규 토큰 없음")
 
         # 5. 재할당 토크나이저 저장
         self.remapped_tokenizer_path.mkdir(parents=True, exist_ok=True)
@@ -188,9 +215,9 @@ class RemapCommand(Command):
 [yellow]현재 vocab 크기:[/yellow] {tokenizer.get_vocab_size():,}
 [yellow]추가된 토큰:[/yellow] {len(new_tokens_to_add):,}개"""
 
-        console.print()
-        console.print(Panel(result_text, title="토큰 재할당 완료", border_style="green"))
-        console.print()
+        self.console.print()
+        self.console.print(Panel(result_text, title="토큰 재할당 완료", border_style="green"))
+        self.console.print()
 
         return {
             "status": "success",

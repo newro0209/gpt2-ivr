@@ -6,6 +6,7 @@
 
 from __future__ import annotations
 
+import argparse
 import logging
 from collections import Counter
 from pathlib import Path
@@ -20,11 +21,17 @@ from gpt2_ivr.analysis.token_frequency import (
     analyze_token_frequency,
     write_frequency_parquet,
 )
+from gpt2_ivr.constants import (
+    BPE_TOKEN_ID_SEQUENCES_FILE,
+    CORPORA_CLEANED_DIR,
+    TOKENIZER_ORIGINAL_DIR,
+    TOKEN_FREQUENCY_FILE,
+)
+from gpt2_ivr.parser import CliHelpFormatter, non_negative_int
 
-from .base import Command
+from .base import Command, SubparsersLike
 
 logger = logging.getLogger(__name__)
-console = Console()
 
 
 class AnalyzeCommand(Command):
@@ -34,6 +41,7 @@ class AnalyzeCommand(Command):
     병렬 처리를 통해 대용량 코퍼스를 효율적으로 처리한다.
 
     Attributes:
+        console: Rich 콘솔 인스턴스
         input_dir: 코퍼스 입력 디렉토리
         output_sequences: BPE 토큰 시퀀스 출력 경로
         output_frequency: 토큰 빈도 parquet 출력 경로
@@ -44,8 +52,35 @@ class AnalyzeCommand(Command):
         encoding: 입력 파일 인코딩
     """
 
+    @staticmethod
+    def configure_parser(subparsers: SubparsersLike) -> None:
+        """서브커맨드 파서를 설정한다.
+
+        Args:
+            subparsers: 서브파서 액션 객체
+        """
+        parser = subparsers.add_parser("analyze", help="BPE 토큰 시퀀스 분석", formatter_class=CliHelpFormatter)
+        parser.add_argument("--input-dir", type=Path, default=CORPORA_CLEANED_DIR, help="코퍼스 입력 디렉토리")
+        parser.add_argument(
+            "--output-sequences", type=Path, default=BPE_TOKEN_ID_SEQUENCES_FILE, help="BPE 토큰 시퀀스 출력 경로"
+        )
+        parser.add_argument(
+            "--output-frequency", type=Path, default=TOKEN_FREQUENCY_FILE, help="토큰 빈도 parquet 출력 경로"
+        )
+        parser.add_argument(
+            "--tokenizer-dir",
+            type=Path,
+            default=TOKENIZER_ORIGINAL_DIR,
+            help="원본 토크나이저 디렉토리",
+        )
+        parser.add_argument("--workers", type=non_negative_int, default=0, help="스레드 워커 수 (0이면 CPU - 1)")
+        parser.add_argument("--chunk-size", type=non_negative_int, default=0, help="스레드 청크 크기(0이면 자동 설정)")
+        parser.add_argument("--max-texts", type=non_negative_int, default=0, help="처리할 최대 텍스트 수 (0이면 전체)")
+        parser.add_argument("--encoding", default="utf-8", help="입력 파일 인코딩")
+
     def __init__(
         self,
+        console: Console,
         input_dir: Path,
         output_sequences: Path,
         output_frequency: Path,
@@ -55,6 +90,20 @@ class AnalyzeCommand(Command):
         max_texts: int,
         encoding: str,
     ):
+        """빈도 분석 커맨드를 생성한다.
+
+        Args:
+            console: Rich 콘솔 인스턴스
+            input_dir: 코퍼스 입력 디렉토리
+            output_sequences: BPE 토큰 시퀀스 출력 경로
+            output_frequency: 토큰 빈도 parquet 출력 경로
+            tokenizer_dir: 원본 토크나이저 디렉토리
+            workers: 스레드 워커 수 (0이면 CPU - 1)
+            chunk_size: 스레드 청크 크기 (0이면 자동 설정)
+            max_texts: 처리할 최대 텍스트 수 (0이면 전체)
+            encoding: 입력 파일 인코딩
+        """
+        self.console = console
         self.input_dir = input_dir
         self.output_sequences = output_sequences
         self.output_frequency = output_frequency
@@ -64,13 +113,10 @@ class AnalyzeCommand(Command):
         self.max_texts = max_texts
         self.encoding = encoding
 
-    def execute(self, **kwargs: Any) -> dict[str, Any]:
+    def execute(self) -> dict[str, Any]:
         """토큰 빈도 분석을 실행한다.
 
         코퍼스를 읽어 토큰화하고, 토큰 ID 시퀀스 파일과 빈도 통계 파일을 생성한다.
-
-        Args:
-            **kwargs: 사용되지 않음
 
         Returns:
             분석 결과 딕셔너리 (sequences_path, frequency_path, total_tokens, unique_tokens)
@@ -118,8 +164,8 @@ class AnalyzeCommand(Command):
         table.add_row("빈도 파일", str(self.output_frequency))
         table.add_row("시퀀스 파일", str(self.output_sequences))
 
-        console.print()
-        console.print(table)
+        self.console.print()
+        self.console.print(table)
 
         # 상위 10개 토큰 표시
         if top_10:
@@ -132,10 +178,10 @@ class AnalyzeCommand(Command):
                 rank_style = "bold green" if idx <= 3 else "dim"
                 top_table.add_row(f"{idx}", f"{token_id}", f"{freq:,}회", style=rank_style)
 
-            console.print()
-            console.print(top_table)
+            self.console.print()
+            self.console.print(top_table)
 
-        console.print()
+        self.console.print()
 
         return {
             "sequences_path": self.output_sequences,
